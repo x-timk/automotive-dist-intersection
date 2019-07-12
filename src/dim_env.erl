@@ -1,5 +1,6 @@
 -module(dim_env).
 -export([main/0]).
+-include_lib("stdlib/include/assert.hrl").
 
 -record(world, {
   dir,
@@ -142,8 +143,42 @@ get_shortest_path(ShortestsPaths, V2) ->
     unreachable -> {result, Res}
   end.
 
+get_neighboorhood(G, V, Range) ->
+  ShortestPaths = dijkstra:run(G, V),
+  lists:filtermap(
+    fun({Node, Res}) ->
+        case Res of
+          {Dist, _} when Dist > 0, Dist =< Range  -> {true, Node};
+          _ -> false
+        end
+    end, ShortestPaths
+  ).
+
+is_node_occupied(G, V) ->
+  case graph:get_vertex_label(G, V) of
+    {_, {_, [_ | _]}} -> true;
+    {_, {_, []}} -> false
+  end.
+
+add_car_to_vertex(G, V, Car) ->
+  {_, {Type, Cars}} = graph:get_vertex_label(G, V),
+  graph:add_vertex(G, V, {Type, [Car | Cars]}).
+
+delete_car_from_vertex(G, V, Car) ->
+  {_, {_, Cars}} = graph:get_vertex_label(G, V),
+  %% ?assert(lists:member(Car, Cars), io:format("Trying to remove ~p from ~p~n", [Car, Cars])),
+  lists:delete(Car, Cars).
+
+move_from_to(G, Car, From, To) ->
+  delete_car_from_vertex(G, From, Car),
+  add_car_to_vertex(G, To, Car).
+
 main() ->
   setup(),
   print(ciao),
   W = create_world(),
-  get_min_path(W#world.dir,i_nord1, o_nord3).
+  get_min_path(W#world.dir,i_nord1, o_nord3),
+  add_car_to_vertex(W#world.undir, i_nord1, ferrari),
+  delete_car_from_vertex(W#world.undir, i_nord1, ferrari),
+  print(is_node_occupied(W#world.undir, i_nord1)),
+  get_neighboorhood(W#world.undir, i_nord1, 7.0).
