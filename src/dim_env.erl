@@ -1,6 +1,8 @@
 -module(dim_env).
 -export([main/0]).
 
+setup() ->
+  code:add_path("../lib/erlang-algorithms/").
 
 %% Simple print to console
 print(What) ->
@@ -69,7 +71,7 @@ createDirGraph() ->
   OOvest3 = graph:add_vertex(G, o_ovest3, {tail_node, []}),
   graph:add_edge(G, OOvest2, OOvest3,2),
   graph:add_edge(G, OOvest1, OOvest2,2),
-  
+
 
   %% CENTRO
   CNordOvest = graph:add_vertex(G, c_nordovest, {cross_node, []}),
@@ -108,7 +110,7 @@ createDirGraph() ->
 
   graph:add_edge(G, CNordEst, CNordOvest, 2),
   graph:add_edge(G, CNordEst, CCentro, 1.414),
- 
+
   graph:add_edge(G, CCentro, CNordOvest,1.414),
   graph:add_edge(G, CCentro, CNordEst,1.414),
   graph:add_edge(G, CCentro, CSudOvest,1.414),
@@ -116,29 +118,19 @@ createDirGraph() ->
 
   G.
 
-getMinPath(G, V1, V2) ->
-  Res = dijkstra:run(G,V1),
-  analyzeResultMinPath(Res, V1, V2).
+get_min_path(G, V1, V2) ->
+  ShortestPaths = dijkstra:run(G,V1),
+  get_shortest_path(ShortestPaths, V2).
 
-analyzeResultMinPath([], V1, V2) ->
-  {result, ko};
-analyzeResultMinPath([H|T], V1, V2) ->
-  {Node,Val} = H,
-  if
-    Node == V2 ->
-      if 
-        Val == unreachable ->
-          {result, unreachable};
-        true ->
-          % {Node,{MaxDistance, Path}} = H, 
-          {MaxDistance, Path} = Val,
-          {result, Path}
-      end;
-    true ->
-      analyzeResultMinPath(T, V1, V2)
+
+get_shortest_path(ShortestsPaths, V2) ->
+  {V2, Res} = lists:keyfind(V2, 1, ShortestsPaths),
+  case Res of
+    {_, Path} -> {result, Path};
+    unreachable -> {result, Res}
   end.
 
 main() ->
-  code:add_path("../lib/erlang-algorithms/"),
+  setup(),
   G = createDirGraph(),
-  getMinPath(G,i_nord1, o_nord3).
+  get_min_path(G,i_nord1, o_nord3).
