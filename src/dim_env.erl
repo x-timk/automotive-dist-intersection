@@ -1,6 +1,11 @@
 -module(dim_env).
 -export([main/0]).
 
+-record(world, {
+  dir,
+  undir
+}).
+
 setup() ->
   code:add_path("../lib/erlang-algorithms/").
 
@@ -9,8 +14,15 @@ print(What) ->
   MyPid = pid_to_list(self()) ++ ":",
   io:format("ENV " ++ MyPid ++ ": " ++ "~p~n", [What]).
 
-createDirGraph() ->
-  G = graph:empty(directed, f),
+create_world() ->
+  #world{
+     dir= create_graph(directed),
+     undir= create_graph(undirected)
+    }.
+
+
+create_graph(GType) ->
+  G = graph:empty(GType, f),
   % NORD
   % Nord IN
   INord1 = graph:add_vertex(G, i_nord1, {top_node, []}),
@@ -132,5 +144,6 @@ get_shortest_path(ShortestsPaths, V2) ->
 
 main() ->
   setup(),
-  G = createDirGraph(),
-  get_min_path(G,i_nord1, o_nord3).
+  print(ciao),
+  W = create_world(),
+  get_min_path(W#world.dir,i_nord1, o_nord3).
