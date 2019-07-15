@@ -79,8 +79,9 @@ start_link(Data) ->
 %% Valore di ritorno atteso è una tupla del tipo
 %% {ok, nome_stato_iniziale, Var} dove Var sara' nel nostro caso il record cardata che mi porto via stato per stato 
 init(CarData) ->
-  print(CarData, "init:: Car Data is " ++ lists:flatten(io_lib:format("~p", [CarData]))),
-  print(CarData, "init:: Starting state is inqueue"),
+  print(CarData, "<<init>> Car SPAWNED! "),
+  print(CarData, "<<init>> Car Data is " ++ lists:flatten(io_lib:format("~p", [CarData]))),
+  print(CarData, "<<init>> Starting state is inqueue"),
   {ok, inqueue, CarData, [{timeout, 2000, ?CAR_MV}]}.
 
 %% Quando invio un messaggio dall'esterno alla state machine 
@@ -178,7 +179,7 @@ inqueue(timeout, ?CAR_MV, CarData) ->
   {NextNode,_} = next_pos(CarData),
   %% chiedo al sensore se la posizione davanti e' libera
   %% la risposta la riceverò sotto forma di evento POSFREE_RESP
-  get_env(CarData) ! { posfree, get_name(CarData), {NextNode} },
+  get_env(CarData) ! { posfree, {get_name(CarData), NextNode} },
   %% Rimango nello stesso stato, imposto sempre timeout per il movimento
   {next_state, inqueue, CarData, [{timeout, CarData#cardata.speed, ?CAR_MV}]};
 
@@ -187,14 +188,13 @@ inqueue(timeout, ?CAR_MV, CarData) ->
 %% MessageData e' l'eventuale payload del messaggio
 %% CarData e' il record contenente le informazioni globali della macchina
 inqueue(info, {Message, MessageData}, CarData) ->
-  print(CarData, Message),
+  % print(CarData, Message),
   State = "inqueue:: ",
   case Message of
     %% Ho ricevuto una response dal sensore di prossimita'
     %% Se il sensore conferma che davanti e' libero e non sono in un top_node posso muovermi
     ?POSFREE_RESP ->
       print(CarData, State ++ "Received Event posfree_resp"),
-      print(CarData, MessageData),
       case MessageData of
         %% Se la prossima posizione e' libera
         false -> 
@@ -205,7 +205,7 @@ inqueue(info, {Message, MessageData}, CarData) ->
             %% Se il nodo e' di tipo tail
             tail_node ->   
               %% Mi posso muovere, quindi mando messaggio all'env, tolgo il primo elemento dalla route e vado in queue
-              get_env(CarData) ! {move, CarData#cardata.name, {CurrentPos, NexPos}},
+              get_env(CarData) ! {move, {CarData#cardata.name, {CurrentPos, NexPos}}},
               NewCarData = pop_position(CarData),
               {next_state, inqueue, NewCarData, [{timeout, CarData#cardata.speed, ?CAR_MV}]};
             %% Se il nodo e' top
@@ -257,7 +257,7 @@ discover(state_timeout, ?DISC_TM, CarData) ->
 discover(info, {Message, MessageData}, CarData) ->
   State = "discover:: ",
   print(CarData, Message),
-  case Message of
+  case Message of      
     ?DISC -> 
       print(CarData,  State ++ "Received Event DISC"),
       print(CarData,  State ++ "Remaining in state <<discover>> and adding car to my neighbours"),
@@ -310,17 +310,21 @@ election(info, {Message, MessageData}, CarData) ->
     ?DISC -> 
       print(CarData,  State ++ "Received Event DISC"),
       print(CarData,  State ++ "Remaining in state <<election>>"),
+      FromProc = MessageData,
       % salvo id macchina da cui ho ricevuto disc
-      {next_state, election, CarData, [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]};
+      % Invio hello al mittente, segnalo che ci sono anche io.
+      FromProc ! {wait, get_name(CarData)},
+      % salvo id macchina da cui ho ricevuto disc
+      {next_state, election, CarData};
     ?HELLO ->
-      print(CarData,  State ++ "Received Event ONTAIL"),
+      print(CarData,  State ++ "Received Event HELLO"),
       print(CarData,  State ++ "Remaining in state <<election>>"),
-      {next_state, election, CarData, [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]};
-    ?WAIT ->
-      print(CarData,  State ++ "Received Event WAIT"),
-      print(CarData,  State ++ "Remaining in state <<election>> and resetting timeout"),
-      {next_state, election, CarData, [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]};
-
+      FromProc = MessageData,
+      % salvo id macchina da cui ho ricevuto disc
+      % Invio hello al mittente, segnalo che ci sono anche io.
+      FromProc ! {wait, get_name(CarData)},
+      {next_state, election, CarData};
+      
     _Other ->
       print(CarData,  State ++ "Received UNKNOWN EVENT"),
       print(CarData,  State ++ "Remaining in state <<inqueue>>"),

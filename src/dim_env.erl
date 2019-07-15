@@ -1,5 +1,7 @@
 -module(dim_env).
--export([main/0, tester/0]).
+-export([main/0, tester/0, tester2/0]).
+%% gen_event export stuff
+-export([init/1, handle_event/2, handle_call/2, handle_info/2, terminate/2]).
 -include_lib("stdlib/include/assert.hrl").
 
 -record(world, {
@@ -9,6 +11,8 @@
 
 %% portata antenna wireless a bordo di ogni auto
 -define(PROX_RANGE, 7).
+
+-behaviour(gen_server).
 
 setup() ->
   print( "Setup").
@@ -230,29 +234,40 @@ broadcast_discover(FromCar, [H | T]) ->
 loop(W) ->
   receive
     %% se ricevo messaggio disc simulo broadcast rigirandolo a tutte le auto a portata
+    {spawn_car, {W, CarName, CarDesc, StartPos, EndPos, Speed}} ->
+      spawn_car(W, CarName, CarDesc, StartPos, EndPos, Speed);
     {disc,FromCar} ->
       % print( "Received disc!!"),
       Cars = get_car_neighboorhood(W#world.undir, FromCar, ?PROX_RANGE),
       % print( "Neighbours are: " ++ Cars),
-      broadcast_discover(FromCar, Cars),
-      print(get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
+      broadcast_discover(FromCar, Cars);
+      % print("Received disc"),
+      % print(get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
     %% se ricevo una richiesta da sensore di prossimita' controllo ed invio come risposta all'auto
     %% un messaggio postfree_resp
     %% false se il nodo e' libero
     %% true se il nodo e' occupato
-    {posfree, FromCar,{V}} ->
+    {posfree, {FromCar,V}} ->
       % print( is_node_occupied(W#world.undir, V)),
-      FromCar ! {posfree_resp, is_node_occupied(W#world.undir, V)},
-      print(get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
+      FromCar ! {posfree_resp, is_node_occupied(W#world.undir, V)};
+      % print("Received posfree"),
+      % print(get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
     %% la macchina FromCar si muove e quindi notifica environment che aggiorna grafo
-    {move, FromCar, {From, To}} ->
+    {move, {FromCar, {From, To}}} ->
       move_from_to(W#world.undir, FromCar, From, To),
+      %% Test eredis lib
+      % {ok, C} = eredis:start_link(),
+      % eredis:q(C, ["PUBLISH", "graph", lists:flatten(io_lib:format("~p", get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)) ))]),
+      % eredis_client:stop(C),
+
+
+      print("Received move"),
       %% Stampo posizione auto nel grafo
       print(get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
     %% Ogni altro messaggio lo ignoro
     _Other ->
       print( _Other),
-      print( get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)))
+      print(get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)))
   end,
   %% Rimango in loop all'infinito
   loop(W).
@@ -278,6 +293,7 @@ get_vertex_cars_array(G, [H|T]) ->
 %% VStop: posizione finale
 %% Speed: velocita' movimento (es: con un valore 2000 l'auto tenta di muoversi ogni 2 secondi)
 spawn_car(W, Name, Desc, VStart, Vstop, Speed) ->
+  print(W),
   Path = get_min_path(W#world.dir, VStart, Vstop),
   add_car_to_vertex(W#world.undir, VStart, Name),
   vehicle:start_link({?MODULE, Name, Desc, get_vertex_type_array(W#world.dir, Path), Speed}).
@@ -295,9 +311,112 @@ main() ->
   % loop(W).
 
 %% Funzione per testare il funzionamento del sistema
+
+%% gen_event stuff
+init(_Args) ->
+  World = create_world(),
+  {ok,World}.
+
+% handle_info(A1, W) ->
+%   print(A1),
+%   {noreply, ok};
+
+handle_info({spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed}}, W) ->
+  print("SPAWN REQUEST"),
+  % print(W),
+  spawn_car(W, CarName, CarDesc, StartPos, EndPos, Speed),
+  print(get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))),
+
+  {noreply, W};
+
+handle_info({disc,FromCar}, W) ->
+  Cars = get_car_neighboorhood(W#world.undir, FromCar, ?PROX_RANGE),
+  % print( "Neighbours are: " ++ Cars),
+  broadcast_discover(FromCar, Cars),
+  {noreply, W};
+
+handle_info({posfree, {FromCar,V}}, W) ->
+  FromCar ! {posfree_resp, is_node_occupied(W#world.undir, V)},
+  {noreply, W};
+
+handle_info({move, {FromCar, {From, To}}}, W) ->
+  move_from_to(W#world.undir, FromCar, From, To),
+  %% Test eredis lib
+  % {ok, C} = eredis:start_link(),
+  % eredis:q(C, ["PUBLISH", "graph", lists:flatten(io_lib:format("~p", get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)) ))]),
+  % eredis_client:stop(C),
+  print("Received move"),
+  %% Stampo posizione auto nel grafo
+  print(get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))),
+  {noreply, W};
+
+
+handle_info(D1, W) ->
+  print("INFOOOOO"),
+  print(D1),
+  print(W),
+  {noreply, W}.
+
+
+handle_call(D1, D2) ->
+  print(D1),
+  print(D2),
+  {ok, D2}.
+handle_event(D1, D2) ->
+  print(D1),
+  print(D2),
+  {ok, D2}.
+
+terminate(_Args, Fd) ->
+  ok.
+
+tester2() ->
+  setup(),
+  World = create_world(),
+  gen_server:start_link({local, dim_env}, dim_env, World, []),
+  dim_env ! {init, ok},
+  dim_env ! {spawn_car, {car1, "LanciaDelta", i_nord3, o_est3, 3000}},
+  timer:sleep(10000),
+
+  dim_env ! {spawn_car, {car2, "Renault5", i_sud3, o_est3, 3000}},
+  timer:sleep(10000),
+
+  dim_env ! {spawn_car, {car3, "Ferrari", i_est3, o_sud3, 3000}},
+  timer:sleep(10000),
+
+  dim_env ! {spawn_car, {car4, "Panda", i_ovest3, o_nord3, 3000}},
+  timer:sleep(10000),
+
+  dim_env ! {spawn_car, {car5, "Clio", i_ovest3, o_sud3, 3000}},
+  ok.
+
+  % gen_event:add_handler(dim_env, dim_env, []).
+
 tester() ->
   setup(),
   W = create_world(),
+
+  % gen_server:start_link({local, dim_env}, dim_env, [], []) => {ok, Pid}
+
+  % Pid = spawn(dim_env, loop, [W]),
+  % register(dim_env, Pid),
+
+  % dim_env ! {spawn_car, {W, car1, "LanciaDelta", i_nord3, o_est3, 3000}},
+  % timer:sleep(1000),
+
+  % dim_env ! {spawn_car, {W, car2, "Renault5", i_sud3, o_est3, 3000}},
+  % timer:sleep(1000),
+
+  % dim_env ! {spawn_car, {W, car3, "Ferrari", i_est3, o_sud3, 3000}},
+  % timer:sleep(1000),
+
+  % dim_env ! {spawn_car, {W, car4, "Panda", i_ovest3, o_nord3, 3000}},
+  % timer:sleep(1000),
+
+  % dim_env ! {spawn_car, {W, car5, "Clio", i_ovest3, o_sud3, 3000}},
+  % timer:sleep(1000),
+
+
   spawn_car(W, car1, "LanciaDelta", i_nord3, o_est3, 3000),
   timer:sleep(1000),
   spawn_car(W, car2, "Renault5", i_sud3, o_est3, 3000),
@@ -308,7 +427,8 @@ tester() ->
   timer:sleep(10000),
   spawn_car(W, car5, "Clio", i_ovest3, o_sud3, 3000),
 
+  loop(W).
 
-  % spawn_car(W#world.undir, car2, "FiatPanda", i_est3, o_ovest3),
-  loop(W). 
+
+  % % spawn_car(W#world.undir, car2, "FiatPanda", i_est3, o_ovest3),
 
