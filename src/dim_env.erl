@@ -7,6 +7,7 @@
   undir
 }).
 
+%% portata antenna wireless a bordo di ogni auto
 -define(PROX_RANGE, 7).
 
 setup() ->
@@ -178,28 +179,32 @@ aux_get_car_neighboorhood(G, [H | Neighbour]) ->
   % print( Cars),
   lists:append(Cars, aux_get_car_neighboorhood(G, Neighbour)).
 
-
 is_node_occupied(G, V) ->
   case graph:get_vertex_label(G, V) of
     {_, {_, [_ | _]}} -> true;
     {_, {_, []}} -> false
   end.
 
+%% Aggiungo macchina Car in nodo V del grafo
 add_car_to_vertex(G, V, Car) ->
   {_, {Type, Cars}} = graph:get_vertex_label(G, V),
   graph:add_vertex(G, V, {Type, [Car | Cars]}).
 
+%% Cancello una macchina Car da nodo V del grafo
 delete_car_from_vertex(G, V, Car) ->
   {_, {Type, Cars}} = graph:get_vertex_label(G, V),
   %% ?assert(lists:member(Car, Cars), io:format("Trying to remove ~p from ~p~n", [Car, Cars])),
   NewCars = lists:delete(Car, Cars),
+  %% tmele: devo modificare il vertice esistente
   graph:add_vertex(G, V, {Type, NewCars} ).
 
+%% Muovo una macchina Car da vertice From a vertice To
 move_from_to(G, Car, From, To) ->
   delete_car_from_vertex(G, From, Car),
   add_car_to_vertex(G, To, Car),
   G.
 
+%% Data una macchina trovo il vertice nel grafo dove si trova
 get_car_vertex(G, Car) ->
   AllVertex = graph:vertices(G),
   aux_get_car_vertex(G, AllVertex, Car).
@@ -214,32 +219,42 @@ aux_get_car_vertex(G, [H|T], Car) ->
   end.
 
 %% Scorro lista di auto e mando disc a tutti
+%% Simulo broadcast dall'auto
 broadcast_discover(_, []) ->
   ok;
 broadcast_discover(FromCar, [H | T]) ->
   H ! {disc, FromCar},
   broadcast_discover(FromCar, T).
 
+%% Loop principale environment
 loop(W) ->
   receive
+    %% se ricevo messaggio disc simulo broadcast rigirandolo a tutte le auto a portata
     {disc,FromCar} ->
       % print( "Received disc!!"),
       Cars = get_car_neighboorhood(W#world.undir, FromCar, ?PROX_RANGE),
       % print( "Neighbours are: " ++ Cars),
       broadcast_discover(FromCar, Cars),
-      print( get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
+      print(get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
+    %% se ricevo una richiesta da sensore di prossimita' controllo ed invio come risposta all'auto
+    %% un messaggio postfree_resp
+    %% false se il nodo e' libero
+    %% true se il nodo e' occupato
     {posfree, FromCar,{V}} ->
       % print( is_node_occupied(W#world.undir, V)),
       FromCar ! {posfree_resp, is_node_occupied(W#world.undir, V)},
-      print( get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
+      print(get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
+    %% la macchina FromCar si muove e quindi notifica environment che aggiorna grafo
     {move, FromCar, {From, To}} ->
       move_from_to(W#world.undir, FromCar, From, To),
       %% Stampo posizione auto nel grafo
-      print( get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
+      print(get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
+    %% Ogni altro messaggio lo ignoro
     _Other ->
       print( _Other),
       print( get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)))
   end,
+  %% Rimango in loop all'infinito
   loop(W).
 
 %% Da lista vertici restituisco array con tupla del tipo {nodo, tipo}
@@ -256,6 +271,12 @@ get_vertex_cars_array(G, [H|T]) ->
   {Node, {_, Cars}} = graph:get_vertex_label(G, H),
   [{Node, Cars} | get_vertex_cars_array(G, T)].
 
+%% Funzione per creare una nuova auto:
+%% Name: atomo che corrispondera' a id registrato, e che viene usato per inviare messaggi all'auto
+%% Desc: descrizione (non utilizzata da nessuna parte)
+%% VStart: posizione iniziale auto
+%% VStop: posizione finale
+%% Speed: velocita' movimento (es: con un valore 2000 l'auto tenta di muoversi ogni 2 secondi)
 spawn_car(W, Name, Desc, VStart, Vstop, Speed) ->
   Path = get_min_path(W#world.dir, VStart, Vstop),
   add_car_to_vertex(W#world.undir, VStart, Name),
@@ -273,6 +294,7 @@ main() ->
   % get_car_vertex(W#world.undir, ferrari),
   % loop(W).
 
+%% Funzione per testare il funzionamento del sistema
 tester() ->
   setup(),
   W = create_world(),

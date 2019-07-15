@@ -13,6 +13,7 @@
 %% Timeout events
 -define(DISC_TM, disc_tm).
 -define(ELECT_TM, elect_tm).
+
 %% Evento scatenato quando la auto vuole muoversi alla prossima posizione
 -define(CAR_MV, car_mv).
 
@@ -24,6 +25,11 @@
 %% Eventi sensoristica
 -define(POSFREE_RESP,posfree_resp).
 
+%% Valori Timeout di stati
+-define(STATE_DISCOVER_TIMEOUT, 5000).
+-define(STATE_ELECTION_TIMEOUT, 5000).
+
+
 %% Messaggio richiesta movimento veicolo
 
 -export([start_link/1]).
@@ -31,6 +37,7 @@
 -export([inqueue/3, discover/3, election/3]).
 -export([print/2]).
 
+%% tupla contenente tutte le info che l'auto si porta dietro tra i vari stati
 -record(cardata, {
     env,
     name,
@@ -39,9 +46,6 @@
     neighbourPids,
     speed
     }).
-% -export([evento_1/1]).
-% -export([init/1,callback_mode/0,terminate/3]).
-% -export([locked/3,open/3]).
 
 
 print(CarData, What) ->
@@ -54,51 +58,45 @@ print(CarData, What) ->
 %% in alternativa posso definire un unica funzione di callback generale con:
 %% callback_mode() ->
   % handle_event_function.
-
-
 callback_mode() ->
   state_functions.
 
 
 %% Faccio partire la macchina a stati finiti: (viene spawnato un processo a livello pratico)
 %% 1) Parametro: registro localmente la state machine con nome "machine_test"
-%%%% Se non la registro ci devo accedere tramite PID
+%%    Se non la registro ci devo accedere tramite PID
 %% 2) Nome del modulo dove si trovano le funzioni di callback (?MODULE è una macro per indicare questo stesso modulo)
 %% 3) Parametro che viene passato alla funzione di init del modulo ?MODULE
 %% 4) Lista di eventuali opzioni avanzate per la state machine
-
-%% L'idea è che quando faccio spawn di una macchina la lancio con {PID_MACCHINA, NOME, ROUTE}
+%% L'idea è che quando faccio spawn di una macchina la lancio con i parametri {Env, Name, Desc, Route, Speed}
 start_link(Data) ->
   {Env, Name, Desc, Route, Speed} = Data,
   CarData = #cardata{env = Env, name = Name, desc = Desc, route = Route, neighbourPids = [], speed = Speed},
   gen_statem:start_link({local,CarData#cardata.name}, ?MODULE, CarData, []).
 
 
-%% ESEMPIO DI COME AVVIARE UNA NUOVA AUTO
-%% vehicle:start_link({myenv, car1, "Fiat", [inord2,inord1]}).
-%% END
-
 %% chiamata se riesco a registrare correttamente la state machine.
 %% Valore di ritorno atteso è una tupla del tipo
-%% {ok, nome_stato_iniziale, Variabile}
+%% {ok, nome_stato_iniziale, Var} dove Var sara' nel nostro caso il record cardata che mi porto via stato per stato 
 init(CarData) ->
   print(CarData, "init:: Car Data is " ++ lists:flatten(io_lib:format("~p", [CarData]))),
   print(CarData, "init:: Starting state is inqueue"),
   {ok, inqueue, CarData, [{timeout, 2000, ?CAR_MV}]}.
 
+%% Quando invio un messaggio dall'esterno alla state machine 
+%% (esempio "invio a car1 un disc da parte di car332" sarebbe: car1 ! {disc, car332})
+%% quest'ultima se lo vede arrivare di default come la tupla {info, {disc, car332}}
+%% Nel caso io non voglia avere quell'info posso chiamare gen_statem:cast
+%% 
+% disc(Data_Evento) ->
+%   gen_statem:cast(?NAME, {disc, Data_Evento}).
+%% In questo modo i messaggi disc arriverebbero come {cast, {disc, car332}}
 
-%% Funzione chiamata caso in cui arriva un evento_1
-% evento_1(Data_Evento) ->
-%   gen_statem:cast(?NAME, {evento_1, Data_Evento}).
-
-%% Se Mi trovo in coda e ricevo evento ontop vado in discover
-%% Imposto un timeout passato il quale viene scatenato evento disc_tm in discover
-
-%% Idea e' che uso il Message per identificare il tipo di msg e il MessageData per eventuali parametri
 
 get_neighbours(CarData) ->
   CarData#cardata.neighbourPids.
 
+%% Resetto i vicini conosciuti (la uso quando torno in discover dopo un election fallita)
 reset_neighbours(CarData) ->
   NewCarData = #cardata{env = CarData#cardata.env, 
                         name = CarData#cardata.name, 
@@ -108,6 +106,7 @@ reset_neighbours(CarData) ->
                         speed = CarData#cardata.speed},
   NewCarData.
 
+%% Aggiungo Car ai vicini conosciuti
 update_neighbours(CarData, Car) ->
   Neighbour = CarData#cardata.neighbourPids,
   NewNeighbour = rem_dups([ Car | Neighbour]),
@@ -121,6 +120,7 @@ update_neighbours(CarData, Car) ->
 
 
 %% Da usare quando mi sono mosso per cancellare dalla rotta la posizione che ho appena lasciato
+%% L'idea e' che in cardata.route ho la lista dei nodi che occuperò (compreso il nodo attuale)
 pop_position(CarData) ->
   Cars = CarData#cardata.route,
   NewCars = aux_pop_position(Cars),
@@ -164,26 +164,34 @@ get_name(CarData) ->
 get_route(CarData) ->
   CarData#cardata.route.
 
+%% Rimuovo duplicati da una lista
 rem_dups(List) ->
     Set = sets:from_list(List),
     sets:to_list(Set).
 
-
+%% Se ricevo un timeout generico di tipo ?CAR_MV significa che l'auto vorrebbe muoversi, dunque devo interrogare sensore prossimita'
 inqueue(timeout, ?CAR_MV, CarData) ->
   State = "inqueue:: ",
-  print(CarData, State ++ "Received event car_mv"),
+  print(CarData, State ++ "Received event car_mv. I Will query proximity sensor."),
   print(CarData, State ++ "Remaining to State <<inqueue>>"),
 
   {NextNode,_} = next_pos(CarData),
   %% chiedo al sensore se la posizione davanti e' libera
+  %% la risposta la riceverò sotto forma di evento POSFREE_RESP
   get_env(CarData) ! { posfree, get_name(CarData), {NextNode} },
   %% Rimango nello stesso stato, imposto sempre timeout per il movimento
   {next_state, inqueue, CarData, [{timeout, CarData#cardata.speed, ?CAR_MV}]};
 
+%% Gestisco tutti gli altri messaggi che arrivano quando sono nello stato "inqueue"
+%% Message corrisponde al tipo di evento ricevuto (ho usato macro)
+%% MessageData e' l'eventuale payload del messaggio
+%% CarData e' il record contenente le informazioni globali della macchina
 inqueue(info, {Message, MessageData}, CarData) ->
   print(CarData, Message),
   State = "inqueue:: ",
   case Message of
+    %% Ho ricevuto una response dal sensore di prossimita'
+    %% Se il sensore conferma che davanti e' libero e non sono in un top_node posso muovermi
     ?POSFREE_RESP ->
       print(CarData, State ++ "Received Event posfree_resp"),
       print(CarData, MessageData),
@@ -205,7 +213,7 @@ inqueue(info, {Message, MessageData}, CarData) ->
               print(CarData, State ++ "I'm on a top node going in discover"),
               % posso mandare disc
               CarData#cardata.env ! {disc, CarData#cardata.name},
-              {next_state, discover, CarData, [{state_timeout, 5000, ?DISC_TM}]}
+              {next_state, discover, CarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]}
           end;
         %% Se la prossima posizione e' occupata non faccio nulla
         true -> 
@@ -216,7 +224,7 @@ inqueue(info, {Message, MessageData}, CarData) ->
       print(CarData, State ++ "Received Event ONTOP"),
       print(CarData, State ++ "Passing to state <<discover>>"),
       CarData#cardata.env ! {disc, CarData#cardata.name},
-      {next_state, discover, CarData, [{state_timeout, 5000, ?DISC_TM}]};
+      {next_state, discover, CarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]};
     ?ONTAIL ->
       print(CarData, State ++ "Received Event ONTAIL"),
       print(CarData, State ++ "Remaining in state <<inqueue>>"),
@@ -244,7 +252,7 @@ discover(state_timeout, ?DISC_TM, CarData) ->
   print(CarData, State ++ "Passing to State <<election>>"),
   print(CarData, State ++ "Current neighbours"),
   print(CarData, get_neighbours(CarData)),
-  {next_state, election, CarData, [{state_timeout, 5000, ?ELECT_TM}]};
+  {next_state, election, CarData, [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]};
 
 discover(info, {Message, MessageData}, CarData) ->
   State = "discover:: ",
@@ -270,13 +278,13 @@ discover(info, {Message, MessageData}, CarData) ->
     ?WAIT ->
       print(CarData,  State ++ "Received Event WAIT"),
       print(CarData,  State ++ "Remaining in state <<discover>> and resetting timeout"),
-      {next_state, discover, CarData, [{state_timeout, 5000, ?DISC_TM}]};
+      {next_state, discover, CarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]};
     ?BULLY_ELECT ->
       print(CarData, State ++ "Receive Event BULLY_ELECT"),
       print(CarData, State ++ "Passing to State <<election>>"),
       print(CarData, State ++ "Current neighbours"),
       print(CarData, get_neighbours(CarData)),
-      {next_state, election, CarData, [{state_timeout, 5000, ?ELECT_TM}]};
+      {next_state, election, CarData, [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]};
     _Other ->
       print(CarData, State ++ "Received UNKNOWN EVENT"),
       print(CarData, State ++ "Remaining in state <<inqueue>>"),
@@ -291,10 +299,10 @@ election(state_timeout, ?ELECT_TM, CarData) ->
   %% Elezione fallita, torno in discover
   CarData#cardata.env ! {disc, CarData#cardata.name},
   NewCarData = reset_neighbours(CarData),
-  {next_state, discover, NewCarData, [{state_timeout, 5000, ?DISC_TM}]};
+  {next_state, discover, NewCarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]};
 
 
-%% da implementare i messaggi di wait
+%% TODO: un po tutto quanto... da implementare i messaggi di wait
 election(info, {Message, MessageData}, CarData) ->
   print(CarData, Message),
   State = "election:: ",
@@ -303,20 +311,20 @@ election(info, {Message, MessageData}, CarData) ->
       print(CarData,  State ++ "Received Event DISC"),
       print(CarData,  State ++ "Remaining in state <<election>>"),
       % salvo id macchina da cui ho ricevuto disc
-      {next_state, election, CarData, [{state_timeout, 5000, ?ELECT_TM}]};
+      {next_state, election, CarData, [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]};
     ?HELLO ->
       print(CarData,  State ++ "Received Event ONTAIL"),
       print(CarData,  State ++ "Remaining in state <<election>>"),
-      {next_state, election, CarData, [{state_timeout, 5000, ?ELECT_TM}]};
+      {next_state, election, CarData, [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]};
     ?WAIT ->
       print(CarData,  State ++ "Received Event WAIT"),
       print(CarData,  State ++ "Remaining in state <<election>> and resetting timeout"),
-      {next_state, election, CarData, [{state_timeout, 5000, ?ELECT_TM}]};
+      {next_state, election, CarData, [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]};
 
     _Other ->
       print(CarData,  State ++ "Received UNKNOWN EVENT"),
       print(CarData,  State ++ "Remaining in state <<inqueue>>"),
-      {next_state, election, CarData}
+      {next_state, election, CarData, [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]}
   end.
 
 
