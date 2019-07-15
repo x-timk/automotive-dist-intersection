@@ -1,5 +1,5 @@
 -module(dim_env).
--export([main/0]).
+-export([main/0, tester/0]).
 -include_lib("stdlib/include/assert.hrl").
 
 -record(world, {
@@ -7,11 +7,15 @@
   undir
 }).
 
+-define(PROX_RANGE, 7).
+
 setup() ->
-  code:add_path("../lib/erlang-algorithms/").
+  print( "Setup").
+  % code:add_path("../lib/erlang-algorithms/"),
+  % register(?MODULE, self()).
 
 %% Simple print to console
-print(What) ->
+print( What) ->
   MyPid = pid_to_list(self()) ++ ":",
   io:format("ENV " ++ MyPid ++ ": " ++ "~p~n", [What]).
 
@@ -139,8 +143,8 @@ get_min_path(G, V1, V2) ->
 get_shortest_path(ShortestsPaths, V2) ->
   {V2, Res} = lists:keyfind(V2, 1, ShortestsPaths),
   case Res of
-    {_, Path} -> {result, Path};
-    unreachable -> {result, Res}
+    {_, Path} -> Path;
+    unreachable -> Res
   end.
 
 get_neighboorhood(G, V, Range) ->
@@ -154,6 +158,27 @@ get_neighboorhood(G, V, Range) ->
     end, ShortestPaths
   ).
 
+%% Restituisco lista di auto vicine a Car
+get_car_neighboorhood(G, Car, Range) ->
+  V = get_car_vertex(G, Car),
+  Neighbour = get_neighboorhood(G, V, Range),
+  Neighbour_vertices = get_vertex_cars_array(G, Neighbour),
+  %% Cancello me stesso dalla lista dei vicini
+  Res = lists:delete(Car, aux_get_car_neighboorhood(G, Neighbour_vertices)),
+  % print( "Car Neighbour are:::"),
+  % print( Neighbour_vertices),
+  % print( Car),
+  % print( Res),
+  Res.
+
+aux_get_car_neighboorhood(_, []) ->
+  [];
+aux_get_car_neighboorhood(G, [H | Neighbour]) ->
+  {_, Cars} = H,
+  % print( Cars),
+  lists:append(Cars, aux_get_car_neighboorhood(G, Neighbour)).
+
+
 is_node_occupied(G, V) ->
   case graph:get_vertex_label(G, V) of
     {_, {_, [_ | _]}} -> true;
@@ -165,20 +190,103 @@ add_car_to_vertex(G, V, Car) ->
   graph:add_vertex(G, V, {Type, [Car | Cars]}).
 
 delete_car_from_vertex(G, V, Car) ->
-  {_, {_, Cars}} = graph:get_vertex_label(G, V),
+  {_, {Type, Cars}} = graph:get_vertex_label(G, V),
   %% ?assert(lists:member(Car, Cars), io:format("Trying to remove ~p from ~p~n", [Car, Cars])),
-  lists:delete(Car, Cars).
+  NewCars = lists:delete(Car, Cars),
+  graph:add_vertex(G, V, {Type, NewCars} ).
 
 move_from_to(G, Car, From, To) ->
   delete_car_from_vertex(G, From, Car),
-  add_car_to_vertex(G, To, Car).
+  add_car_to_vertex(G, To, Car),
+  G.
+
+get_car_vertex(G, Car) ->
+  AllVertex = graph:vertices(G),
+  aux_get_car_vertex(G, AllVertex, Car).
+
+aux_get_car_vertex(_, [], _) ->
+  false;
+aux_get_car_vertex(G, [H|T], Car) ->
+  {_, {_, Cars}} = graph:get_vertex_label(G, H),
+  case lists:member(Car, Cars) of
+    false -> aux_get_car_vertex(G, T, Car);
+    true -> H
+  end.
+
+%% Scorro lista di auto e mando disc a tutti
+broadcast_discover(_, []) ->
+  ok;
+broadcast_discover(FromCar, [H | T]) ->
+  H ! {disc, FromCar},
+  broadcast_discover(FromCar, T).
+
+loop(W) ->
+  receive
+    {disc,FromCar} ->
+      % print( "Received disc!!"),
+      Cars = get_car_neighboorhood(W#world.undir, FromCar, ?PROX_RANGE),
+      % print( "Neighbours are: " ++ Cars),
+      broadcast_discover(FromCar, Cars),
+      print( get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
+    {posfree, FromCar,{V}} ->
+      % print( is_node_occupied(W#world.undir, V)),
+      FromCar ! {posfree_resp, is_node_occupied(W#world.undir, V)},
+      print( get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
+    {move, FromCar, {From, To}} ->
+      move_from_to(W#world.undir, FromCar, From, To),
+      %% Stampo posizione auto nel grafo
+      print( get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)));
+    _Other ->
+      print( _Other),
+      print( get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)))
+  end,
+  loop(W).
+
+%% Da lista vertici restituisco array con tupla del tipo {nodo, tipo}
+get_vertex_type_array(_, []) ->
+  [];
+get_vertex_type_array(G, [H|T]) ->
+  {Node, {Type, _}} = graph:get_vertex_label(G, H),
+  [{Node, Type} | get_vertex_type_array(G, T)].
+
+%% Da lista vertici restituisco array con tupla del tipo {nodo, [macchine]}
+get_vertex_cars_array(_, []) ->
+  [];
+get_vertex_cars_array(G, [H|T]) ->
+  {Node, {_, Cars}} = graph:get_vertex_label(G, H),
+  [{Node, Cars} | get_vertex_cars_array(G, T)].
+
+spawn_car(W, Name, Desc, VStart, Vstop, Speed) ->
+  Path = get_min_path(W#world.dir, VStart, Vstop),
+  add_car_to_vertex(W#world.undir, VStart, Name),
+  vehicle:start_link({?MODULE, Name, Desc, get_vertex_type_array(W#world.dir, Path), Speed}).
 
 main() ->
   setup(),
-  print(ciao),
+  print( ciao),
   W = create_world(),
-  get_min_path(W#world.dir,i_nord1, o_nord3),
-  add_car_to_vertex(W#world.undir, i_nord1, ferrari),
-  delete_car_from_vertex(W#world.undir, i_nord1, ferrari),
-  print(is_node_occupied(W#world.undir, i_nord1)),
-  get_neighboorhood(W#world.undir, i_nord1, 7.0).
+  get_min_path(W#world.dir,i_nord1, o_nord3).
+  % add_car_to_vertex(W#world.undir, i_nord1, ferrari),
+  % delete_car_from_vertex(W#world.undir, i_nord1, ferrari),
+  % print( is_node_occupied(W#world.undir, i_nord1)),
+  % get_neighboorhood(W#world.undir, i_nord1, 7.0),
+  % get_car_vertex(W#world.undir, ferrari),
+  % loop(W).
+
+tester() ->
+  setup(),
+  W = create_world(),
+  spawn_car(W, car1, "LanciaDelta", i_nord3, o_est3, 3000),
+  timer:sleep(1000),
+  spawn_car(W, car2, "Renault5", i_sud3, o_est3, 3000),
+  timer:sleep(1000),
+  spawn_car(W, car3, "Ferrari", i_est3, o_sud3, 3000),
+  timer:sleep(1000),
+  spawn_car(W, car4, "Panda", i_ovest3, o_nord3, 3000),
+  timer:sleep(10000),
+  spawn_car(W, car5, "Clio", i_ovest3, o_sud3, 3000),
+
+
+  % spawn_car(W#world.undir, car2, "FiatPanda", i_est3, o_ovest3),
+  loop(W). 
+
