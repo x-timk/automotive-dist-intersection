@@ -16,7 +16,7 @@ Elenco possibili messaggi:
 ## Modulo VEHICLE
 Il veicolo è una macchina a stati finiti.
 I Messaggi che un veicolo può ricevere e le azioni intraprese di conseguenza dipendono dall stato in cui il veicolo si trova.
-I messaggi possono essere di due tipi:
+I messaggi possono essere di 3 tipi:
  - {info, {Message, MessageData}}: Messaggi ricevuti da processi esterni
  - {timeout, EVENTO_TIMEOUT}: Eventi di timeout generici scatenati internamente
  - {state_timeout, EVENTO_TIMEOUT}: Eventi di timeout di stato scatenati internamente
@@ -27,7 +27,7 @@ Di seguito per ogni stato l'elenco dei possibili messaggi/eventi e relative azio
  - {posfree_resp, true/false} :  
    - Se ricevo false e mi trovo in un nodo tail posso avanzare
    - Se ricevo false e mi trovo in un nodo top non posso avanzare; passo allo stato discover e mando in broadcast un disc ai miei vicini.
-  - Se ricevo true stò fermo e rimango in stato inqueue resettando timeout CAR_MV
+   - Se ricevo true stò fermo e rimango in stato inqueue resettando timeout CAR_MV
  - ontop: non usato
  - ontail: non usato
  - disc: se ricevo un disc quando sono in stato inqueue ignoro la richiesta semplicemente.
