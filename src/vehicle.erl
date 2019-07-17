@@ -28,6 +28,7 @@
 -define(BULLY_ELECT, elect).
 -define(BULLY_COORD, coord).
 -define(BULLY_ANS, ans).
+-define(BULLY_NO_ANS, no_ans).
 
 %% Eventi sensoristica
 -define(POSFREE_RESP,posfree_resp).
@@ -35,6 +36,7 @@
 %% Valori Timeout di stati
 -define(STATE_DISCOVER_TIMEOUT, 5000).
 -define(STATE_ELECTION_TIMEOUT, 5000).
+-define(BULLY_ANSWER_TIMEOUT, 1000).
 
 
 %% Messaggio richiesta movimento veicolo
@@ -189,6 +191,16 @@ send_hello(Car, FromCar) ->
 send_wait(Car, FromCar, Reason) ->
   gen_statem:cast(Car, {?WAIT, {FromCar, Reason}}).
 
+send_bully_elect(Car) ->
+  try
+    gen_statem:call(Car, ?BULLY_ELECT, ?BULLY_ANSWER_TIMEOUT)
+  catch
+    exit:{timeout,_} -> ?BULLY_NO_ANS
+  end.
+
+send_bully_coord(Car) ->
+  gen_statem:cast(Car, ?BULLY_COORD).
+
 inqueue(enter, _OldState, CarData) ->
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
   {keep_state, CarData};
@@ -309,13 +321,41 @@ discover(cast, {?WAIT, {_FromCar, _Reason}}, CarData) ->
         [?FUNCTION_NAME]),
   {next_state, discover, CarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]};
 
+discover({call, From}, ?BULLY_ELECT, CarData) ->
+  {next_state, election, CarData, [{reply, From, ?BULLY_ANS}]};
+discover(cast, ?BULLY_COORD, CarData) ->
+  {next_state, election, CarData};
+
 discover(info, Msg, CarData) ->
   print(CarData, "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p", [?FUNCTION_NAME, Msg]),
-  {next_state, discover, CarData}.
+  {next_state, discover, CarData};
+discover(A, B, C) ->
+  print(C, "EventType: ~p Content: ~p", [A, B]).
+
 
 election(enter, _OldState, CarData) ->
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
-  {keep_state, CarData};
+  Me = get_name(CarData),
+  Others = lists:map(fun({C,_}) -> C end, get_neighbours(CarData)),
+  print(CarData, "Me: ~p Others: ~p", [Me, Others]),
+  GreaterPids = lists:filter(fun(Other) -> Other > Me end, Others),
+  print(CarData, "greater Pids: ~p", [GreaterPids]),
+  Answers = lists:map(fun(Other) ->
+                          {Other, send_bully_elect(Other)}
+                      end,
+                      GreaterPids),
+  {BullyAns, BullyNoAns} = lists:partition(
+                             fun({_, Ans}) -> Ans =:= ?BULLY_ANS end,
+                             Answers
+                            ),
+  %% TODO: Fix update, atm does not work
+  ActiveNeigbours = CarData#cardata.neighbourPids -- BullyNoAns,
+  NewCarData = CarData#cardata{neighbourPids = ActiveNeigbours},
+  case BullyAns of
+    [] -> lists:map(fun({Car,_}) -> send_bully_coord(Car) end, ActiveNeigbours);
+    _  -> ok
+  end,
+  {keep_state, NewCarData, [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]};
 
 election(state_timeout, ?ELECT_TM, CarData) ->
   %% Elezione fallita, torno in discover
@@ -327,7 +367,7 @@ election(cast, {?DISC, {FromCar, _Route}}, CarData) ->
   % Invio hello al mittente, segnalo che ci sono anche io.
   send_wait(FromCar, get_name(CarData), "i'm in election state"),
   % salvo id macchina da cui ho ricevuto disc
-  {next_state, election, CarData};
+  {keep_state, CarData};
 
 %% TODO: un po tutto quanto... da implementare i messaggi di wait
 
@@ -335,8 +375,13 @@ election(cast, {?HELLO, {FromCar, _Route}}, CarData) ->
   % salvo id macchina da cui ho ricevuto disc
   % Invio hello al mittente, segnalo che ci sono anche io.
   send_wait(FromCar, get_name(CarData), "I'm in election"),
-  {next_state, election, CarData};
+  keep_state_and_data;
 
+election({call, From}, ?BULLY_ELECT, _CarData) ->
+  {keep_state_and_data, [{reply, From, ?BULLY_ANS}]};
+election(cast, ?BULLY_COORD, _CarData) ->
+  %% TODO:
+  keep_state_and_data;
 
 election(info, Msg, CarData) ->
   print(CarData, "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p", [?FUNCTION_NAME, Msg]),
