@@ -274,19 +274,19 @@ inqueue(info, Msg, CarData) ->
 discover(enter, _OldState, CarData) ->
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
   NewCarData = reset_neighbours(CarData),
-  dim_env:broadcast_disc(get_name(NewCarData)),
+  dim_env:broadcast_disc({get_name(NewCarData), get_route(NewCarData)}),
   {keep_state,NewCarData};
 
 
-discover(cast, {?DISC, FromCar}, CarData) ->
+discover(cast, {?DISC, Msg={FromCar, _Route}}, CarData) ->
   print(CarData, "<<~s>>:: Received Event ~p", [?FUNCTION_NAME, ?DISC]),
   print(CarData, "Remaining in state <<~s>> and adding ~p to my neighbours",
-       [?FUNCTION_NAME, FromCar]),
+       [?FUNCTION_NAME, Msg]),
   % salvo id macchina da cui ho ricevuto disc
-  NewCarData = update_neighbours(CarData, FromCar),
+  NewCarData = update_neighbours(CarData, Msg),
   % NewCarData = #cardata{name = CarData#cardata.name, desc = CarData#cardata.desc, route = CarData#cardata.route, neighbourPids = [ToProc | CarData#cardata.neighbourPids]},
   % Invio hello al mittente, segnalo che ci sono anche io.
-  send_hello(FromCar, get_name(NewCarData)),
+  send_hello(FromCar, {get_name(NewCarData), get_route(NewCarData)}),
   {next_state, discover, NewCarData};
 
 discover(state_timeout, ?DISC_TM, CarData) ->
@@ -295,12 +295,12 @@ discover(state_timeout, ?DISC_TM, CarData) ->
         [?FUNCTION_NAME, get_neighbours(CarData)]),
   {next_state, election, CarData, [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]};
 
-discover(cast, {?HELLO, FromCar}, CarData) ->
+discover(cast, {?HELLO, Msg}, CarData) ->
   print(CarData, "<<~s>>:: Received Event ~p", [?FUNCTION_NAME, ?HELLO]),
   print(CarData, "Remaining in state <<~s>> and adding ~p to my neighbours",
-        [?FUNCTION_NAME, FromCar]),
+        [?FUNCTION_NAME, Msg]),
 
-  NewCarData = update_neighbours(CarData, FromCar),
+  NewCarData = update_neighbours(CarData, Msg),
   {next_state, discover, NewCarData};
 
 discover(cast, {?WAIT, {_FromCar, _Reason}}, CarData) ->
@@ -320,10 +320,9 @@ election(enter, _OldState, CarData) ->
 election(state_timeout, ?ELECT_TM, CarData) ->
   %% Elezione fallita, torno in discover
   NewCarData = reset_neighbours(CarData),
-  dim_env:broadcast_disc(get_name(NewCarData)),
   {next_state, discover, NewCarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]};
 
-election(cast, {?DISC, FromCar}, CarData) ->
+election(cast, {?DISC, {FromCar, _Route}}, CarData) ->
   % salvo id macchina da cui ho ricevuto disc
   % Invio hello al mittente, segnalo che ci sono anche io.
   send_wait(FromCar, get_name(CarData), "i'm in election state"),
@@ -332,7 +331,7 @@ election(cast, {?DISC, FromCar}, CarData) ->
 
 %% TODO: un po tutto quanto... da implementare i messaggi di wait
 
-election(cast, {?HELLO, FromCar}, CarData) ->
+election(cast, {?HELLO, {FromCar, _Route}}, CarData) ->
   % salvo id macchina da cui ho ricevuto disc
   % Invio hello al mittente, segnalo che ci sono anche io.
   send_wait(FromCar, get_name(CarData), "I'm in election"),

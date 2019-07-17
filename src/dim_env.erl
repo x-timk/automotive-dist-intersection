@@ -278,9 +278,9 @@ notify_move(CarName, CurrentPos, NextPos) ->
 
 
 
-handle_cast({disc, FromCar},W) ->
+handle_cast({disc, Msg={FromCar, _Route}},W) ->
   Cars = get_car_neighboorhood(W#world.undir, FromCar, ?PROX_RANGE),
-  broadcast_discover(FromCar, Cars),
+  broadcast_discover(Msg, Cars),
   {noreply, W}.
 
 
