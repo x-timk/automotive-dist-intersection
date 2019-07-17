@@ -1,5 +1,5 @@
 -module(dim_env).
--export([main/0, tester2/0]).
+-export([tester2/0]).
 
 %% Export Public API genserver
 -export([spawn_car/5, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3]).
@@ -18,15 +18,14 @@
 
 -behaviour(gen_server).
 
-setup() ->
-  print( "Setup").
-  % code:add_path("../lib/erlang-algorithms/"),
-  % register(?MODULE, self()).
-
 %% Simple print to console
-print( What) ->
-  MyPid = pid_to_list(self()) ++ ":",
-  io:format("ENV " ++ MyPid ++ ": " ++ "~p~n", [What]).
+%% print( What) ->
+%%   MyPid = pid_to_list(self()) ++ ":",
+%%   io:format("ENV " ++ MyPid ++ ": " ++ "~p~n", [What]).
+
+print(Format, Args) ->
+  Usr = io_lib:format(Format, Args),
+  io:format("ENV: " ++ Usr ++ "~n").
 
 create_world() ->
   #world{
@@ -174,17 +173,12 @@ get_car_neighboorhood(G, Car, Range) ->
   Neighbour_vertices = get_vertex_cars_array(G, Neighbour),
   %% Cancello me stesso dalla lista dei vicini
   Res = lists:delete(Car, aux_get_car_neighboorhood(G, Neighbour_vertices)),
-  % print( "Car Neighbour are:::"),
-  % print( Neighbour_vertices),
-  % print( Car),
-  % print( Res),
   Res.
 
 aux_get_car_neighboorhood(_, []) ->
   [];
 aux_get_car_neighboorhood(G, [H | Neighbour]) ->
   {_, Cars} = H,
-  % print( Cars),
   lists:append(Cars, aux_get_car_neighboorhood(G, Neighbour)).
 
 is_node_occupied(G, V) ->
@@ -256,22 +250,10 @@ get_vertex_cars_array(G, [H|T]) ->
 %% VStop: posizione finale
 %% Speed: velocita' movimento (es: con un valore 2000 l'auto tenta di muoversi ogni 2 secondi)
 add_car_to_graph(W, Name, Desc, VStart, Vstop, Speed) ->
-  print(W),
   Path = get_min_path(W#world.dir, VStart, Vstop),
   add_car_to_vertex(W#world.undir, VStart, Name),
   vehicle:start_link({?MODULE, Name, Desc, get_vertex_type_array(W#world.dir, Path), Speed}).
 
-main() ->
-  setup(),
-  print( ciao),
-  W = create_world(),
-  get_min_path(W#world.dir,i_nord1, o_nord3).
-  % add_car_to_vertex(W#world.undir, i_nord1, ferrari),
-  % delete_car_from_vertex(W#world.undir, i_nord1, ferrari),
-  % print( is_node_occupied(W#world.undir, i_nord1)),
-  % get_neighboorhood(W#world.undir, i_nord1, 7.0),
-  % get_car_vertex(W#world.undir, ferrari),
-  % loop(W).
 
 %% Funzione per testare il funzionamento del sistema
 
@@ -280,14 +262,11 @@ init(_Args) ->
   World = create_world(),
   {ok,World}.
 
-% handle_info(A1, W) ->
-%   print(A1),
-%   {noreply, ok};
 
 spawn_car(CarName, CarDesc, StartPos, EndPos, Speed) ->
   gen_server:call(?MODULE, {spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed}}).
 
-broadcast_disc(FromCar) -> 
+broadcast_disc(FromCar) ->
   gen_server:cast(?MODULE, {disc, FromCar}).
 
 %% Request proximity sensor data
@@ -301,7 +280,6 @@ notify_move(CarName, CurrentPos, NextPos) ->
 
 handle_cast({disc, FromCar},W) ->
   Cars = get_car_neighboorhood(W#world.undir, FromCar, ?PROX_RANGE),
-  % print( "Neighbours are: " ++ Cars),
   broadcast_discover(FromCar, Cars),
   {noreply, W}.
 
@@ -317,22 +295,19 @@ handle_call({move, {CarName, {CurrentPos, NextPos}}}, _From, W) ->
   % {ok, C} = eredis:start_link(),
   % eredis:q(C, ["PUBLISH", "graph", lists:flatten(io_lib:format("~p", get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir)) ))]),
   % eredis_client:stop(C),
-  print("Received move"),
+  print("Received move", []),
   %% Stampo posizione auto nel grafo
-  print(get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))),
+  print("~p", [get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))]),
   {reply, ok, W};
 
 handle_call({spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed}}, _From, W) ->
-   print("SPAWN REQUEST"),
-  % print(W),
+  print("SPAWN REQUEST",[]),
   add_car_to_graph(W, CarName, CarDesc, StartPos, EndPos, Speed),
-  print(get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))),
+  print("~p", [get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))]),
   {reply, CarName, W}.
 
 handle_info(D1, W) ->
-  print("INFOOOOO"),
-  print(D1),
-  print(W),
+  print("INFO D1: ~p W: ~p", [D1, W]),
   {noreply, W}.
 
 
@@ -340,7 +315,6 @@ terminate(_Args, _Fd) ->
   ok.
 
 tester2() ->
-  setup(),
   World = create_world(),
   gen_server:start_link({local, ?MODULE}, dim_env, World, []),
   dim_env:spawn_car(car1, "LanciaDelta", i_nord3, o_est3, 1000),
