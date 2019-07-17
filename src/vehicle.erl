@@ -66,7 +66,7 @@ print(CarData, What) ->
 %% callback_mode() ->
   % handle_event_function.
 callback_mode() ->
-  state_functions.
+  [state_functions, state_enter].
 
 
 %% Faccio partire la macchina a stati finiti: (viene spawnato un processo a livello pratico)
@@ -189,6 +189,10 @@ send_hello(Car, FromCar) ->
 send_wait(Car, FromCar, Reason) ->
   gen_statem:cast(Car, {?WAIT, {FromCar, Reason}}).
 
+inqueue(enter, OldState, CarData) ->
+  print(CarData, "Entered in << queue >> state"),
+  {keep_state, CarData};
+
 inqueue(cast, {?DISC, _FromCar}, CarData) ->
   State = "inqueue:: ",
   print(CarData, State ++ "Received Event DISC, but I am not in discovery. Ignoring this message"),
@@ -227,6 +231,7 @@ inqueue(cast, {?DISC, _FromCar}, CarData) ->
 
 
 %% Se ricevo un timeout generico di tipo ?CAR_MV significa che l'auto vorrebbe muoversi, dunque devo interrogare sensore prossimita'
+
 inqueue(timeout, ?CAR_MV, CarData) ->
   State = "inqueue:: ",
   print(CarData, State ++ "Received event car_mv. I Will query proximity sensor."),
@@ -256,8 +261,8 @@ inqueue(timeout, ?CAR_MV, CarData) ->
           print(CarData, State ++ "I'm on a top node going in discover"),
 
           % posso mandare disc
-          %% TODO da spostare in una enter state callback
-          dim_env:broadcast_disc(get_name(CarData)),
+          %% TODO da spostare in una enter state callback, FATTO
+          % dim_env:broadcast_disc(get_name(CarData)),
           {next_state, discover, CarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]}
       end;
     %% Se la prossima posizione e' occupata non faccio nulla
@@ -277,6 +282,14 @@ inqueue(info, Msg, CarData) ->
   print(CarData, Msg),
   print(CarData, State ++ "Remaining in state <<inqueue>>"),
   {next_state, inqueue, CarData}.
+
+
+discover(enter, OldState, CarData) -> 
+  print(CarData, "Entered in << discover >> state"),
+  NewCarData = reset_neighbours(CarData),
+  dim_env:broadcast_disc(get_name(NewCarData)),
+  {keep_state,NewCarData};
+
 
 discover(cast, {?DISC, FromCar}, CarData) ->
   State = "discover:: ",
@@ -318,6 +331,10 @@ discover(info, Msg, CarData) ->
   print(CarData, Msg),
   print(CarData, State ++ "Remaining in state <<inqueue>>"),
   {next_state, discover, CarData}.
+
+election(enter, OldState, CarData) ->
+  print(CarData, "Entered in << election >> state"),
+  {keep_state, CarData};
 
 election(state_timeout, ?ELECT_TM, CarData) ->
   State = "election:: ",
