@@ -1,5 +1,5 @@
 -module(dim_env).
--export([tester2/0]).
+-export([t/0]).
 
 %% Export Public API genserver
 -export([spawn_car/5, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3]).
@@ -314,7 +314,7 @@ handle_info(D1, W) ->
 terminate(_Args, _Fd) ->
   ok.
 
-tester2() ->
+t() ->
   World = create_world(),
   gen_server:start_link({local, ?MODULE}, dim_env, World, []),
   dim_env:spawn_car(car1, "LanciaDelta", i_nord3, o_est3, 1000),
