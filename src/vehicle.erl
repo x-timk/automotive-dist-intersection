@@ -54,7 +54,8 @@
     route,
     neighbourPids,
     speed,
-    isLeader = false
+    isLeader = false,
+    priority = 0
     }).
 
 
@@ -107,26 +108,35 @@ init(CarData) ->
 get_neighbours(CarData) ->
   CarData#cardata.neighbourPids.
 
+get_priority(CarData) ->
+  CarData#cardata.priority.
+
+increment_priority(CarData) ->
+  NewCarData = CarData#cardata{priority = get_priority(CarData) + 1},
+  NewCarData.
+
 %% Resetto i vicini conosciuti (la uso quando torno in discover dopo un election fallita)
 reset_neighbours(CarData) ->
-  NewCarData = #cardata{env = CarData#cardata.env, 
-                        name = CarData#cardata.name, 
-                        desc = CarData#cardata.desc, 
-                        route = CarData#cardata.route, 
-                        neighbourPids = [],
-                        speed = CarData#cardata.speed},
+  % NewCarData = #cardata{env = CarData#cardata.env, 
+  %                       name = CarData#cardata.name, 
+  %                       desc = CarData#cardata.desc, 
+  %                       route = CarData#cardata.route, 
+  %                       neighbourPids = [],
+  %                       speed = CarData#cardata.speed},
+  NewCarData = CarData#cardata{neighbourPids = []},
   NewCarData.
 
 %% Aggiungo Car ai vicini conosciuti
 update_neighbours(CarData, Car) ->
   Neighbour = CarData#cardata.neighbourPids,
   NewNeighbour = rem_dups([ Car | Neighbour]),
-  NewCarData = #cardata{env = CarData#cardata.env, 
-                        name = CarData#cardata.name, 
-                        desc = CarData#cardata.desc, 
-                        route = CarData#cardata.route, 
-                        neighbourPids = NewNeighbour,
-                        speed = CarData#cardata.speed},
+  % NewCarData = #cardata{env = CarData#cardata.env, 
+  %                       name = CarData#cardata.name, 
+  %                       desc = CarData#cardata.desc, 
+  %                       route = CarData#cardata.route, 
+  %                       neighbourPids = NewNeighbour,
+  %                       speed = CarData#cardata.speed},
+  NewCarData = CarData#cardata{neighbourPids = NewNeighbour},
   NewCarData.
 
 
@@ -135,12 +145,13 @@ update_neighbours(CarData, Car) ->
 pop_position(CarData) ->
   Cars = CarData#cardata.route,
   NewCars = aux_pop_position(Cars),
-  NewCarData = #cardata{env = CarData#cardata.env, 
-                        name = CarData#cardata.name, 
-                        desc = CarData#cardata.desc, 
-                        route = NewCars, 
-                        neighbourPids = CarData#cardata.neighbourPids,
-                        speed = CarData#cardata.speed},
+  % NewCarData = #cardata{env = CarData#cardata.env, 
+  %                       name = CarData#cardata.name, 
+  %                       desc = CarData#cardata.desc, 
+  %                       route = NewCars, 
+  %                       neighbourPids = CarData#cardata.neighbourPids,
+  %                       speed = CarData#cardata.speed},
+  NewCarData = CarData#cardata{route = NewCars},
   NewCarData.
 
 aux_pop_position([]) ->
@@ -378,13 +389,32 @@ election(info, Msg, CarData) ->
 
 slave(enter, _OldState, CarData) ->
   print(CarData, "Slave waiting the master", []),
-  keep_state_and_data;
+  %% Trasformo lista in set
+  MyRoute = sets:from_list(get_route(CarData)),
+
+  %% OtherRoutes diventa una lista di {Car, SetRotte}
+  OtherRoutes = lists:map(fun({Car, Route}) -> {Car, sets:from_list(Route)} end, get_neighbours(CarData)),
+
+  % print(CarData, "<<~s>>:: MyRoute ~p OtherRoutes ~p", [?FUNCTION_NAME, MyRoute, OtherRoutes]),
+  
+  %% Conflicts un oggetto di questo tipo: {me, [{othercar1,true},{othercar2, false}...]}
+  %% in questo caso ho che othercar1 non ha conflitti con me, mentre othercar2 è in conflitto
+  NewCarData = increment_priority(CarData),
+  Conflicts = {{get_name(NewCarData), get_priority(NewCarData)}, lists:map(fun({Car, Route}) -> {Car, sets:is_disjoint(MyRoute, Route)} end, OtherRoutes)},
+  
+  print(NewCarData, "<<~s>>:: Conflicts ~p", [?FUNCTION_NAME, Conflicts]), 
+  {keep_state, NewCarData};
+
 slave(cast,{?DISC, {FromCar, _Route}}, CarData) ->
   %% Invio wait al mittente
   send_wait(FromCar, get_name(CarData), "I'm a SLAVE"),
   keep_state_and_data;
 slave(cast, _, _) ->
   keep_state_and_data;
+
+slave({call, From}, ?BULLY_ELECT, _CarData) ->
+  {keep_state_and_data, [{reply, From, ?BULLY_ANS}]};
+
 slave(info, From, CarData) ->
   From ! CarData,
   keep_state_and_data.
@@ -392,7 +422,24 @@ slave(info, From, CarData) ->
 master(enter, _OldState, CarData) ->
   print(CarData, "Master ready to coordinate", []),
   lists:map(fun({Car,_}) -> send_bully_coord(Car) end, CarData#cardata.neighbourPids),
-  keep_state_and_data;
+  MyRoute = sets:from_list(get_route(CarData)),
+
+  %% OtherRoutes diventa una lista di {Car, SetRotte}
+  OtherRoutes = lists:map(fun({Car, Route}) -> {Car, sets:from_list(Route)} end, get_neighbours(CarData)),
+
+  % print(CarData, "<<~s>>:: MyRoute ~p OtherRoutes ~p", [?FUNCTION_NAME, MyRoute, OtherRoutes]),
+  
+  %% Conflicts un oggetto di questo tipo: {{me, priority}, [{othercar1,true},{othercar2, false}...]}
+  %% in questo caso ho che othercar1 non ha conflitti con me, mentre othercar2 è in conflitto
+  NewCarData = increment_priority(CarData),
+  Conflicts = {{get_name(NewCarData), get_priority(NewCarData)}, lists:map(fun({Car, Route}) -> {Car, sets:is_disjoint(MyRoute, Route)} end, OtherRoutes)},
+  
+  print(NewCarData, "<<~s>>:: Conflicts ~p", [?FUNCTION_NAME, Conflicts]), 
+  {keep_state, NewCarData};
+
+master({call, From}, ?BULLY_ELECT, _CarData) ->
+  {keep_state_and_data, [{reply, From, ?BULLY_ANS}]};
+
 master(cast,{?DISC, {FromCar, _Route}}, CarData) ->
   %% Invio wait al mittente.
   send_wait(FromCar, get_name(CarData), "I'm the LEADER"),

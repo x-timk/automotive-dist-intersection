@@ -317,20 +317,20 @@ terminate(_Args, _Fd) ->
 t() ->
   World = create_world(),
   gen_server:start_link({local, ?MODULE}, dim_env, World, []),
-  dim_env:spawn_car(car1, "LanciaDelta", i_nord3, o_est3, 1000),
-  timer:sleep(4000),
+  dim_env:spawn_car(car1, "LanciaDelta", i_nord3, o_sud3, 1000),
+  timer:sleep(500),
 
-  dim_env:spawn_car(car2, "LanciaDelta", i_ovest3, o_est3, 1000),
-  timer:sleep(4000),
+  dim_env:spawn_car(car2, "LanciaDelta", i_est3, o_nord3, 1000),
+  timer:sleep(3000),
 
-  dim_env:spawn_car(car3, "LanciaDelta", i_sud3, o_est3, 1000),
-  timer:sleep(4000),
+  dim_env:spawn_car(car3, "LanciaDelta", i_sud3, o_nord3, 1000),
+  timer:sleep(3000),
 
   dim_env:spawn_car(car4, "LanciaDelta", i_est3, o_est3, 1000),
-  timer:sleep(4000),
+  timer:sleep(3000),
 
   dim_env:spawn_car(car5, "LanciaDelta", i_nord3, o_est3, 1000),
-  timer:sleep(4000),
+  timer:sleep(3000),
 
   dim_env:spawn_car(car6, "LanciaDelta", i_ovest3, o_est3, 1000),
 
