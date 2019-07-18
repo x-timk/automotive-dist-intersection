@@ -191,6 +191,14 @@ bool(Cond, X, Y) ->
 is_empty([]) -> true;
 is_empty([_ | _]) -> false.
 
+move_to_next_pos(CarData) ->
+  {CurrentPos, _} = current_pos(CarData),
+  {NextPos, _}= next_pos(CarData),
+  dim_env:notify_move(get_name(CarData), CurrentPos, NextPos),
+  pop_route_leg(CarData).
+
+pop_route_leg(CarData = #cardata{route=Route}) ->
+  CarData#cardata{route=tl(Route)}.
 
 %% Vehicle PUBLIC API
 send_disc(DestCar, FromCar) ->
@@ -228,34 +236,27 @@ inqueue(cast, {?DISC, _FromCar}, CarData) ->
 %% Se ricevo un timeout generico di tipo ?CAR_MV significa che l'auto vorrebbe
 %% muoversi, dunque devo interrogare sensore prossimità
 inqueue(timeout, ?CAR_MV, CarData) ->
-  print(CarData, "<<~s>>:: Received event ~p. I Will query proximity sensor.", [?FUNCTION_NAME, ?CAR_MV]),
-  {NextNode,_} = next_pos(CarData),
+  print(CarData,
+        "<<~s>>:: Received event ~p. I Will query proximity sensor.",
+        [?FUNCTION_NAME, ?CAR_MV]),
+  MvTimeOut = {timeout, CarData#cardata.speed, ?CAR_MV},
+  {NextNode, NextNodeType} = next_pos(CarData),
   %% chiedo al sensore se la posizione davanti e' libera
-  %% la risposta la riceverò sotto forma di evento POSFREE_RESP
   IsFree = dim_env:req_prox_sensor_data(get_name(CarData), NextNode),
-  print(CarData, "<<~s>>:: Received Event posfree_resp ~p", [?FUNCTION_NAME, IsFree]),
-  case IsFree of
-    %% Se la prossima posizione e' libera
-    true ->
-      {CurrentPos,CurrentPosType} = current_pos(CarData),
-      {NexPos,_} = next_pos(CarData),
-      case CurrentPosType of
-        %% Se il nodo e' di tipo tail
-        tail_node ->
-          %% Mi posso muovere, quindi mando messaggio all'env, tolgo il primo elemento dalla route e vado in queue
-          dim_env:notify_move(get_name(CarData), CurrentPos, NexPos),
-          % get_env(CarData) ! {move, {CarData#cardata.name, {CurrentPos, NexPos}}},
-          NewCarData = pop_position(CarData),
-          {next_state, inqueue, NewCarData, [{timeout, CarData#cardata.speed, ?CAR_MV}]};
-        %% Se il nodo e' top
-        top_node ->
-          print(CarData, "<<~s>>:: I'm on a top node going in discover", [?FUNCTION_NAME]),
-
-          {next_state, discover, CarData}
-      end;
-    %% Se la prossima posizione e' occupata non faccio nulla
-    false ->
-      {next_state, inqueue, CarData, [{timeout, CarData#cardata.speed, ?CAR_MV}]}
+  print(CarData,
+        "<<~s>>:: Received Event posfree_resp ~p",
+        [?FUNCTION_NAME, IsFree]),
+  case {IsFree, NextNodeType} of
+    {false, _} ->
+      {next_state, inqueue, CarData, [MvTimeOut]};
+    {true, tail_node} ->
+      print(CarData, "Moving to next node", []),
+      NewCarData = move_to_next_pos(CarData),
+      {next_state, inqueue, NewCarData, [MvTimeOut]};
+    {true, top_node} ->
+      print(CarData, "Moving to next node and going into <<discover>>", []),
+      NewCarData = move_to_next_pos(CarData),
+      {next_state, discover, NewCarData}
   end;
 
 %% Gestisco tutti gli altri messaggi che arrivano quando sono nello stato "inqueue"
