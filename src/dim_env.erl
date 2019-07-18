@@ -287,7 +287,7 @@ handle_cast({disc, Msg={FromCar, _Route}},W) ->
 
 handle_call({posfree, {_FromCar, Position}}, _From, W) ->
   % vehicle:send_posfree_resp(FromCar, is_node_occupied(W#world.undir, Position)),
-  {reply, is_node_occupied(W#world.undir, Position), W};
+  {reply, not is_node_occupied(W#world.undir, Position), W};
 
 handle_call({move, {CarName, {CurrentPos, NextPos}}}, _From, W) ->
   move_from_to(W#world.undir, CarName, CurrentPos, NextPos),

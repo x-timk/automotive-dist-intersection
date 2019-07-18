@@ -224,49 +224,19 @@ inqueue(cast, {?DISC, _FromCar}, CarData) ->
   print(CarData, "<<~s>>:: Remaining in this state", [?FUNCTION_NAME]),
   {next_state, inqueue, CarData};
 
-% %% chiamata da send_postfree_resp
-% inqueue(cast, {?POSFREE_RESP, IsOccupied}, CarData) ->
-%   State = "inqueue:: ",
-%   print(CarData, State ++ "Received Event posfree_resp"),
-%   case IsOccupied of
-%     %% Se la prossima posizione e' libera
-%     false -> 
-%       print(CarData, current_pos(CarData)),
-%       {CurrentPos,CurrentPosType} = current_pos(CarData),
-%       {NexPos,_} = next_pos(CarData),
-%       case CurrentPosType of
-%         %% Se il nodo e' di tipo tail
-%         tail_node ->   
-%           %% Mi posso muovere, quindi mando messaggio all'env, tolgo il primo elemento dalla route e vado in queue
-%           get_env(CarData) ! {move, {CarData#cardata.name, {CurrentPos, NexPos}}},
-%           NewCarData = pop_position(CarData),
-%           {next_state, inqueue, NewCarData, [{timeout, CarData#cardata.speed, ?CAR_MV}]};
-%         %% Se il nodo e' top
-%         top_node ->
-%           print(CarData, State ++ "I'm on a top node going in discover"),
-%           % posso mandare disc
-%           dim_env:broadcast_disc(get_name(CarData)),
-%           {next_state, discover, CarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]}
-%       end;
-%     %% Se la prossima posizione e' occupata non faccio nulla
-%     true -> 
-%       print(CarData, "Next position occupied"),
-%       {next_state, inqueue, CarData, [{timeout, CarData#cardata.speed, ?CAR_MV}]}
-%   end;
 
-
-%% Se ricevo un timeout generico di tipo ?CAR_MV significa che l'auto vorrebbe muoversi, dunque devo interrogare sensore prossimita'
-
+%% Se ricevo un timeout generico di tipo ?CAR_MV significa che l'auto vorrebbe
+%% muoversi, dunque devo interrogare sensore prossimità
 inqueue(timeout, ?CAR_MV, CarData) ->
   print(CarData, "<<~s>>:: Received event ~p. I Will query proximity sensor.", [?FUNCTION_NAME, ?CAR_MV]),
   {NextNode,_} = next_pos(CarData),
   %% chiedo al sensore se la posizione davanti e' libera
   %% la risposta la riceverò sotto forma di evento POSFREE_RESP
-  IsOccupied = dim_env:req_prox_sensor_data(get_name(CarData), NextNode),
-  print(CarData, "<<~s>>:: Received Event posfree_resp ~p", [?FUNCTION_NAME, IsOccupied]),
-  case IsOccupied of
+  IsFree = dim_env:req_prox_sensor_data(get_name(CarData), NextNode),
+  print(CarData, "<<~s>>:: Received Event posfree_resp ~p", [?FUNCTION_NAME, IsFree]),
+  case IsFree of
     %% Se la prossima posizione e' libera
-    false ->
+    true ->
       {CurrentPos,CurrentPosType} = current_pos(CarData),
       {NexPos,_} = next_pos(CarData),
       case CurrentPosType of
@@ -284,7 +254,7 @@ inqueue(timeout, ?CAR_MV, CarData) ->
           {next_state, discover, CarData}
       end;
     %% Se la prossima posizione e' occupata non faccio nulla
-    true ->
+    false ->
       {next_state, inqueue, CarData, [{timeout, CarData#cardata.speed, ?CAR_MV}]}
   end;
 
