@@ -43,7 +43,7 @@
 
 -export([start_link/1]).
 -export([init/1, callback_mode/0, terminate/3]).
--export([inqueue/3, discover/3, election/3]).
+-export([inqueue/3, discover/3, election/3, slave/3, master/3]).
 %% -export([print/3]).
 
 %% tupla contenente tutte le info che l'auto si porta dietro tra i vari stati
@@ -53,7 +53,8 @@
     desc,
     route,
     neighbourPids,
-    speed
+    speed,
+    isLeader = false
     }).
 
 
@@ -179,6 +180,19 @@ rem_dups(List) ->
     Set = sets:from_list(List),
     sets:to_list(Set).
 
+%% Se Cond è true ritorna X, altrimenti ritorna Y
+bool(Cond, X, Y) ->
+  if
+    is_boolean(Cond) andalso Cond -> X;
+    is_boolean(Cond) andalso not Cond -> Y;
+    not is_boolean(Cond) -> erlang:error(badarg)
+  end.
+
+is_empty([]) -> true;
+is_empty([_ | _]) -> false.
+
+
+%% Vehicle PUBLIC API
 send_disc(DestCar, FromCar) ->
   gen_statem:cast(DestCar, {?DISC, FromCar}).
 
@@ -208,7 +222,7 @@ inqueue(enter, _OldState, CarData) ->
 inqueue(cast, {?DISC, _FromCar}, CarData) ->
   print(CarData, "<<~s>>:: Received Event DISC, but I am not in discovery. Ignoring this message", [?FUNCTION_NAME]),
   print(CarData, "<<~s>>:: Remaining in this state", [?FUNCTION_NAME]),
-  {next_state, inqueue, CarData, [{timeout, CarData#cardata.speed, ?CAR_MV}]};
+  {next_state, inqueue, CarData};
 
 % %% chiamata da send_postfree_resp
 % inqueue(cast, {?POSFREE_RESP, IsOccupied}, CarData) ->
@@ -267,7 +281,7 @@ inqueue(timeout, ?CAR_MV, CarData) ->
         top_node ->
           print(CarData, "<<~s>>:: I'm on a top node going in discover", [?FUNCTION_NAME]),
 
-          {next_state, discover, CarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]}
+          {next_state, discover, CarData}
       end;
     %% Se la prossima posizione e' occupata non faccio nulla
     true ->
@@ -287,7 +301,7 @@ discover(enter, _OldState, CarData) ->
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
   NewCarData = reset_neighbours(CarData),
   dim_env:broadcast_disc({get_name(NewCarData), get_route(NewCarData)}),
-  {keep_state,NewCarData};
+  {keep_state,NewCarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]};
 
 
 discover(cast, {?DISC, Msg={FromCar, _Route}}, CarData) ->
@@ -319,11 +333,13 @@ discover(cast, {?WAIT, {_FromCar, _Reason}}, CarData) ->
   print(CarData, "<<~s>>:: Received Event ~p", [?FUNCTION_NAME, ?WAIT]),
   print(CarData, "Remaining in state <<~s>> and resetting timeout",
         [?FUNCTION_NAME]),
-  {next_state, discover, CarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]};
+  timer:sleep(2000),
+  repeat_state_and_data;
 
 discover({call, From}, ?BULLY_ELECT, CarData) ->
   {next_state, election, CarData, [{reply, From, ?BULLY_ANS}]};
 discover(cast, ?BULLY_COORD, CarData) ->
+  %% Avendo implementato il Bully come da libro questo stato dovrebbe essere un errore
   {next_state, election, CarData};
 
 discover(info, Msg, CarData) ->
@@ -344,23 +360,26 @@ election(enter, _OldState, CarData) ->
                           {Other, send_bully_elect(Other)}
                       end,
                       GreaterPids),
-  {BullyAns, BullyNoAns} = lists:partition(
+  {BullyAns, _BullyNoAns} = lists:partition(
                              fun({_, Ans}) -> Ans =:= ?BULLY_ANS end,
                              Answers
                             ),
-  %% TODO: Fix update, atm does not work
-  ActiveNeigbours = CarData#cardata.neighbourPids -- BullyNoAns,
-  NewCarData = CarData#cardata{neighbourPids = ActiveNeigbours},
-  case BullyAns of
-    [] -> lists:map(fun({Car,_}) -> send_bully_coord(Car) end, ActiveNeigbours);
-    _  -> ok
-  end,
-  {keep_state, NewCarData, [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]};
+  %% Se BullyANs è vuoto allora sono il leader
+  %% Se sono il leader non ncessito di un election timeout
+  {IsLeader, ElectionTimeOut} = bool(is_empty(BullyAns),
+                                     {true, 0},
+                                     {false, ?STATE_ELECTION_TIMEOUT}),
+  {keep_state,
+   CarData#cardata{isLeader=IsLeader},
+   [{state_timeout, ElectionTimeOut, ?ELECT_TM}]};
 
-election(state_timeout, ?ELECT_TM, CarData) ->
+election(state_timeout, ?ELECT_TM, CarData = #cardata{isLeader=true}) ->
+  {next_state, master, CarData};
+
+election(state_timeout, ?ELECT_TM, CarData = #cardata{isLeader=false}) ->
   %% Elezione fallita, torno in discover
   NewCarData = reset_neighbours(CarData),
-  {next_state, discover, NewCarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]};
+  {next_state, discover, NewCarData};
 
 election(cast, {?DISC, {FromCar, _Route}}, CarData) ->
   % salvo id macchina da cui ho ricevuto disc
@@ -379,14 +398,40 @@ election(cast, {?HELLO, {FromCar, _Route}}, CarData) ->
 
 election({call, From}, ?BULLY_ELECT, _CarData) ->
   {keep_state_and_data, [{reply, From, ?BULLY_ANS}]};
-election(cast, ?BULLY_COORD, _CarData) ->
-  %% TODO:
-  keep_state_and_data;
+election(cast, ?BULLY_COORD, CarData) ->
+  {next_state, slave, CarData};
 
 election(info, Msg, CarData) ->
   print(CarData, "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p", [?FUNCTION_NAME, Msg]),
   {next_state, election, CarData}.
 
+slave(enter, _OldState, CarData) ->
+  print(CarData, "Slave waiting the master", []),
+  keep_state_and_data;
+slave(cast,{?DISC, {FromCar, _Route}}, CarData) ->
+  %% Invio wait al mittente
+  send_wait(FromCar, get_name(CarData), "I'm a SLAVE"),
+  keep_state_and_data;
+slave(cast, _, _) ->
+  keep_state_and_data;
+slave(info, From, CarData) ->
+  From ! CarData,
+  keep_state_and_data.
+
+master(enter, _OldState, CarData) ->
+  print(CarData, "Master ready to coordinate", []),
+  lists:map(fun({Car,_}) -> send_bully_coord(Car) end, CarData#cardata.neighbourPids),
+  keep_state_and_data;
+master(cast,{?DISC, {FromCar, _Route}}, CarData) ->
+  %% Invio wait al mittente.
+  send_wait(FromCar, get_name(CarData), "I'm the LEADER"),
+  keep_state_and_data;
+
+master(cast, _, _) ->
+  keep_state_and_data;
+master(info, From, CarData) ->
+  From ! CarData,
+  keep_state_and_data.
 
 
 terminate(_Reason, _State, _Data) ->
