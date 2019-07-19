@@ -1,47 +1,76 @@
-# Elenco messaggi/azioni
-Vengono quì specificati i possibili messaggi/eventi e le relative azioni intraprese per ogni modulo
+
+# Elenco API Esposte
+Vengono quì specificate le funzioni che sono chiamabili esternamente per ogni modulo
 ## Modulo ENVIRONMENT
-I Messaggi che l'environment riceve hanno la stessa struttura di base: {tipologia_messaggio,payload}
-Elenco possibili messaggi:
- - {spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed}}: L'environment genera una nuova auto. Di seguito una descrizione dei parametri
+Le funzioni possono essere chiamate da un qualsiasi modulo esterno in maniera standard (dim_env:nomefun(args)
+Elenco API:
+ - spawn_car(CarName, CarDesc, StartPos, EndPos, Speed)
+Usata per ordinare all'env di generare una nuova auto
    - CarName: Nome Macchina. Usare un atom() in questo caso. L'atom viene registrato dalla vm erlang; Si utilizzerà il CarName invece del pid per inviare messaggi all'auto
    - CarDesc: Una stringa di descrizione per l'auto
    - StartPos: posizione di partenza dell'auto. I nomi dei nodi del grafo sono atomi.
    - EndPos: posizione alla quale l'auto desidera arrivare. Da StartPos ed EndPos verrà automaticamente calcolato il percorso più breve (si utilizza dijkstra)
    - Speed: Velocità di movimento dell'auto. Es: se speed vale 2000 allora l'auto tenterà di muoversi in avanti ogni 2 secondi
- - {disc,FromCar}: L'environment riceve un disc dall'auto FromCar. Dovrà simulare il fatto che la FromCar manda un broadcast alle auto a portata wifi. Vengono quindi trovate le auto nelle vicinanze di FromCar (funzione get_car_neighboorhood) e quindi per ogni vicino rigiro il messaggio {disc, FromCar} così com'è.
- - {posfree, {FromCar,V}}: L'environment riceve una richiesta da sensore di prossimità dell'auto FromCar che chiede se la posizione V è libera. Viene inviata all'auto una risposta che può essere {posfree_resp, true} se V è occupato o {posfree_resp, false} se V è libero.
- - {move, {FromCar, {From, To}}}: L'auto FromCar si muove da nodo From a nodo To. In questo caso l'env deve solamente aggiornare il grafo in base allo spostamento dell'auto.
+
+ - broadcast_disc(FromCar)
+ Simula il broadcast dell'auto FromCar. Vengono calcolati i vicini di FromCar e quindi viene forwardato il messaggio disc.
+
+ - req_prox_sensor_data(FromCar, Position) ->
+Chiamata richiesta dati dal sensore di prossimità dell'auto
+ - notify_move(CarName, CurrentPos, NextPos) ->
+Chiamata utilizzata da veicolo per notificare all'env il cambio della posizione
+
 
 ## Modulo VEHICLE
-Il veicolo è una macchina a stati finiti.
-I Messaggi che un veicolo può ricevere e le azioni intraprese di conseguenza dipendono dall stato in cui il veicolo si trova.
-I messaggi possono essere di 3 tipi:
- - {info, {Message, MessageData}}: Messaggi ricevuti da processi esterni
- - {timeout, EVENTO_TIMEOUT}: Eventi di timeout generici scatenati internamente
- - {state_timeout, EVENTO_TIMEOUT}: Eventi di timeout di stato scatenati internamente
+Il veicolo è una macchina a stati finiti con un il suo set di variabili globali che vengono aggiornate mano a mano che vengono ricevuti eventi.
+ - env: Identificativo environment
+ - name: Identificativo da usare per contattare auto
+ - desc: Descrizione
+ - route: Percorso nel grafo
+ - neighbourPids: Macchine a portata wifi
+ - speed: velocità
+ - isleader: booleano che identifica leader
+ - leader: ID macchina leader
+ - electionPids: Macchine che partecipano a elezione/agreement. Questo potrebbe essere potenzialmente diverso da neighbourPids.
 
-Di seguito per ogni stato l'elenco dei possibili messaggi/eventi e relative azioni:
-### Stato inqueue:
-#### Messaggi tipo info:
- - {posfree_resp, true/false} :  
-   - Se ricevo false e mi trovo in un nodo tail posso avanzare
-   - Se ricevo false e mi trovo in un nodo top non posso avanzare; passo allo stato discover e mando in broadcast un disc ai miei vicini.
-   - Se ricevo true stò fermo e rimango in stato inqueue resettando timeout CAR_MV
- - ontop: non usato
- - ontail: non usato
- - disc: se ricevo un disc quando sono in stato inqueue ignoro la richiesta semplicemente.
-#### Messaggi tipo state_timeout: 
- - {timeout, CAR_MV}: evento scatenato quando scade timeout generico per movimento auto. In questo caso invio a sensore prossimità richiesta all'env per sapere se ho qualcuno davanti
-### Stato discover:
-#### Messaggi tipo info:
- - {disc, FromCar}: Ho ricevuto un messaggio broadcast da un mio vicino; Mi registro il suo id tra i miei vicini conosciuti, e mando come risposta un messaggio {hello, MIOID} per segnalare "ci sono"
- - {hello, FromCar}: Dopo aver mandato un disc in broadcast posso ricevere 0 o più messaggi di questo tipo dalle auto a portata. Quando ricevo un messaggio di questo tipo mi salvo il FromCar tra la lista dei miei vicini e basta.
- - {wait, _}: Se ricevo un messaggio di questo tipo rimango in discover e resetto il timeout di stato DISC_TM
- - {bully_elect,_} e altri messaggi da implementare.
-#### Messaggi tipo state_timeout:
- - {state_timeout, DISC_TM}: Evento scatenato quando scade timeout di stato discover. In questo caso passo allo stato election, e (da implementare) inizio elezione.
+Ogni veicolo espone delle API per poterci interagire.
+In ogni stato la chiamata ad una API potrebbe avere effetti diversi.
+Di seguito si riporta l'elenco completo delle API e, per ogni stato del veicolo, le azioni intraprese alla RICEZIONE di queste chiamate.
 
-### Stato election: 
-TODO praticamente tutto, ho solo messo un timeout di stato che mi riporta in discover
+### send_disc(DestCar, FromCar): 
+Viene utilizzata dall'env per forwardare il disc proveniente da FromCar verso DestCar
+ - Inqueue: Ignoro il messaggio
+ - Discover: mi salvo DestCar tra le auto a me conosciute (neighbourPids) e invio come risposta a DestCar un send_hello
+ - Election/Slave/Mfetch: mi salvo DestCar tra le auto a me conosciute (neighbourPids) e invio un hello e un wait come risposta
+
+
+### send_hello(Car, FromCar)
+Utilizzato per inviare messaggio hello a Car da FromCar
+ - Inqueue: Ignoro il messaggio
+ - Discover/Election/Slave/Mfetch: mi salvo FromCar tra le auto a me conosciute (neighbourPids)
+
+### send_wait(Car, FromCar, Reason)
+Invio un messaggio di wait a Car da FromCar con una Reason
+
+
+### send_leader_exists(DestCar)
+Funzione Sincrona.
+Interrogo DestCar chiedendogli se si trova in elezione/agreement.
+Funzione utilizzata dalle auto in discover per capire se in un incrocio ci sono veicoli che sono già in fase di elezione/agreement. Se è così allora non posso andare in stato election, ma devo rimanere in discover. 
+
+ - Discover: rispondo false (io non mi trovo nè in elezione nè in agreement)
+ - Election/Slave/Mfetch: rispondo true
+
+### send_bully_elect(Car)
+Funzione sincrona che manda messaggio elezione a Car (bully algo). Si aspetta una risposta bullyans / bullynoans (se il veicolo a cui ho mandato la richiesta è morto) / wait (non dovrebbe mai capitare)
+ - Discover: mi salvo i neighbourPids attuali in electionPids. Rispondo con bullyans e passo in stato Election
+ - Election: rispondo con bullyans e rimango in Election
+ - Slave/Mfetch: non dovrei mai ricevere questo evento in questi stati
+
+### send_bully_coord(Car)
+Funzione che manda messaggio coord (bully algo) a Car.
+ - Discover: mi salvo i neighbourPids attuali in electionPids. Passo in stato Slave
+ - Election: Passo in stato Slave
+ - Slave/Mfetch: non dovrei mai ricevere questo evento in questi stati
+
 
