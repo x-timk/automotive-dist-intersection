@@ -51,9 +51,9 @@
     env,
     name,
     desc,
-    route,
-    neighbourPids,
-    speed,
+    route = [],
+    neighbourPids = [],
+    speed = 2000,
     isLeader = false,
     priority = 0
     }).
@@ -63,13 +63,9 @@ print(CarData, Format, What) ->
   Def = io_lib:format("CAR ~p: ", [get_name(CarData)]),
   Usr = io_lib:format(Format, What),
   io:format(Def ++ Usr ++ "~n").
-  % io:format("PID " ++ MyPid ++ ": " ++ What ++ "~n").
 
-%% state_functions: Events are handled by one callback function per state. 
-%% %% Una funzione di gestione specifica per ogni stato
-%% in alternativa posso definire un unica funzione di callback generale con:
-%% callback_mode() ->
-  % handle_event_function.
+%% state_functions: Events are handled by one callback function per state.
+%% Una funzione di gestione specifica per ogni stato
 callback_mode() ->
   [state_functions, state_enter].
 
@@ -89,20 +85,11 @@ start_link(Data) ->
 
 %% chiamata se riesco a registrare correttamente la state machine.
 %% Valore di ritorno atteso è una tupla del tipo
-%% {ok, nome_stato_iniziale, Var} dove Var sara' nel nostro caso il record cardata che mi porto via stato per stato 
+%% {ok, nome_stato_iniziale, Var} dove Var sarà nel nostro caso il record cardata che mi porto via stato per stato
 init(CarData) ->
   print(CarData, "<<~s>> Car SPAWNED!", [?FUNCTION_NAME]),
   print(CarData, "<<~s>> Car Data is ~p", [?FUNCTION_NAME, CarData]),
   {ok, inqueue, CarData, [{timeout, 2000, ?CAR_MV}]}.
-
-%% Quando invio un messaggio dall'esterno alla state machine 
-%% (esempio "invio a car1 un disc da parte di car332" sarebbe: car1 ! {disc, car332})
-%% quest'ultima se lo vede arrivare di default come la tupla {info, {disc, car332}}
-%% Nel caso io non voglia avere quell'info posso chiamare gen_statem:cast
-%% 
-% disc(Data_Evento) ->
-%   gen_statem:cast(?NAME, {disc, Data_Evento}).
-%% In questo modo i messaggi disc arriverebbero come {cast, {disc, car332}}
 
 
 get_neighbours(CarData) ->
@@ -112,70 +99,24 @@ get_priority(CarData) ->
   CarData#cardata.priority.
 
 increment_priority(CarData) ->
-  NewCarData = CarData#cardata{priority = get_priority(CarData) + 1},
-  NewCarData.
+  CarData#cardata{priority = get_priority(CarData) + 1}.
 
-%% Resetto i vicini conosciuti (la uso quando torno in discover dopo un election fallita)
 reset_neighbours(CarData) ->
-  % NewCarData = #cardata{env = CarData#cardata.env, 
-  %                       name = CarData#cardata.name, 
-  %                       desc = CarData#cardata.desc, 
-  %                       route = CarData#cardata.route, 
-  %                       neighbourPids = [],
-  %                       speed = CarData#cardata.speed},
-  NewCarData = CarData#cardata{neighbourPids = []},
-  NewCarData.
+  CarData#cardata{neighbourPids = []}.
 
 %% Aggiungo Car ai vicini conosciuti
-update_neighbours(CarData, Car) ->
-  Neighbour = CarData#cardata.neighbourPids,
-  NewNeighbour = rem_dups([ Car | Neighbour]),
-  % NewCarData = #cardata{env = CarData#cardata.env, 
-  %                       name = CarData#cardata.name, 
-  %                       desc = CarData#cardata.desc, 
-  %                       route = CarData#cardata.route, 
-  %                       neighbourPids = NewNeighbour,
-  %                       speed = CarData#cardata.speed},
-  NewCarData = CarData#cardata{neighbourPids = NewNeighbour},
-  NewCarData.
-
-
-%% Da usare quando mi sono mosso per cancellare dalla rotta la posizione che ho appena lasciato
-%% L'idea e' che in cardata.route ho la lista dei nodi che occuperò (compreso il nodo attuale)
-pop_position(CarData) ->
-  Cars = CarData#cardata.route,
-  NewCars = aux_pop_position(Cars),
-  % NewCarData = #cardata{env = CarData#cardata.env, 
-  %                       name = CarData#cardata.name, 
-  %                       desc = CarData#cardata.desc, 
-  %                       route = NewCars, 
-  %                       neighbourPids = CarData#cardata.neighbourPids,
-  %                       speed = CarData#cardata.speed},
-  NewCarData = CarData#cardata{route = NewCars},
-  NewCarData.
-
-aux_pop_position([]) ->
-  [];
-aux_pop_position([_|T]) ->
-  T.
+add_neighbour(CarData, Car) ->
+  Neighbours = CarData#cardata.neighbourPids,
+  NewNeighbours = rem_dups([ Car | Neighbours]),
+  CarData#cardata{neighbourPids = NewNeighbours}.
 
 %% Restituisco tupla {nodo, tipo}
-current_pos(CarData) ->
-  aux_current_pos(CarData#cardata.route).
-
-aux_current_pos([]) ->
-  {finish, arrived};
-aux_current_pos([H | _]) ->
-  H.
+current_pos(#cardata{route=[Pos | _]}) -> Pos;
+current_pos(_) -> {finish, arrived}.
 
 %% Restituisco tupla {nodo, tipo}
-next_pos(CarData) ->
-  aux_next_pos(CarData#cardata.route).
-
-aux_next_pos([_ | [S | _]] ) ->
-  S;
-aux_next_pos(_) ->
-  arrived.
+next_pos(#cardata{route=[_, NextPos | _]}) -> NextPos;
+next_pos(_) -> {finish, arrived}.
 
 get_env(CarData) ->
   CarData#cardata.env.
@@ -202,12 +143,16 @@ bool(Cond, X, Y) ->
 is_empty([]) -> true;
 is_empty([_ | _]) -> false.
 
+%% Notifica l'environment che è necesssario far avanzare la macchina
 move_to_next_pos(CarData) ->
   {CurrentPos, _} = current_pos(CarData),
   {NextPos, _}= next_pos(CarData),
   dim_env:notify_move(get_name(CarData), CurrentPos, NextPos),
   pop_route_leg(CarData).
 
+%% Da usare quando mi sono mosso per cancellare dalla rotta la posizione che ho
+%% appena lasciato: in #cardata.route ho la lista dei nodi che occuperò
+%% (compreso il nodo attuale)
 pop_route_leg(CarData = #cardata{route=Route}) ->
   CarData#cardata{route=tl(Route)}.
 
@@ -239,7 +184,10 @@ inqueue(enter, _OldState, CarData) ->
   {keep_state, CarData};
 
 inqueue(cast, {?DISC, _FromCar}, CarData) ->
-  print(CarData, "<<~s>>:: Received Event DISC, but I am not in discovery. Ignoring this message", [?FUNCTION_NAME]),
+  print(CarData,
+        "<<~s>>:: Received Event DISC, but I am not in discovery."
+        " Ignoring this message",
+        [?FUNCTION_NAME]),
   print(CarData, "<<~s>>:: Remaining in this state", [?FUNCTION_NAME]),
   {next_state, inqueue, CarData};
 
@@ -275,7 +223,9 @@ inqueue(timeout, ?CAR_MV, CarData) ->
 %% MessageData e' l'eventuale payload del messaggio
 %% CarData e' il record contenente le informazioni globali della macchina
 inqueue(info, Msg, CarData) ->
-  print(CarData, "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p", [?FUNCTION_NAME, Msg]),
+  print(CarData,
+        "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p",
+        [?FUNCTION_NAME, Msg]),
   {next_state, inqueue, CarData}.
 
 
@@ -290,10 +240,9 @@ discover(cast, {?DISC, Msg={FromCar, _Route}}, CarData) ->
   print(CarData, "<<~s>>:: Received Event ~p", [?FUNCTION_NAME, ?DISC]),
   print(CarData, "Remaining in state <<~s>> and adding ~p to my neighbours",
        [?FUNCTION_NAME, Msg]),
-  % salvo id macchina da cui ho ricevuto disc
-  NewCarData = update_neighbours(CarData, Msg),
-  % NewCarData = #cardata{name = CarData#cardata.name, desc = CarData#cardata.desc, route = CarData#cardata.route, neighbourPids = [ToProc | CarData#cardata.neighbourPids]},
-  % Invio hello al mittente, segnalo che ci sono anche io.
+  %% Salvo id macchina da cui ho ricevuto disc
+  NewCarData = add_neighbour(CarData, Msg),
+  %% Invio hello al mittente, segnalo che ci sono anche io.
   send_hello(FromCar, {get_name(NewCarData), get_route(NewCarData)}),
   {next_state, discover, NewCarData};
 
@@ -301,14 +250,15 @@ discover(state_timeout, ?DISC_TM, CarData) ->
   print(CarData, "<<~s>>:: Received event ~p", [?FUNCTION_NAME, ?DISC_TM]),
   print(CarData, "<<~s>>:: Passing to State <<election>> with neighbours: ~p",
         [?FUNCTION_NAME, get_neighbours(CarData)]),
-  {next_state, election, CarData, [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]};
+  {next_state, election, CarData,
+   [{state_timeout, ?STATE_ELECTION_TIMEOUT, ?ELECT_TM}]};
 
 discover(cast, {?HELLO, Msg}, CarData) ->
   print(CarData, "<<~s>>:: Received Event ~p", [?FUNCTION_NAME, ?HELLO]),
   print(CarData, "Remaining in state <<~s>> and adding ~p to my neighbours",
         [?FUNCTION_NAME, Msg]),
 
-  NewCarData = update_neighbours(CarData, Msg),
+  NewCarData = add_neighbour(CarData, Msg),
   {next_state, discover, NewCarData};
 
 discover(cast, {?WAIT, {_FromCar, _Reason}}, CarData) ->
@@ -321,11 +271,14 @@ discover(cast, {?WAIT, {_FromCar, _Reason}}, CarData) ->
 discover({call, From}, ?BULLY_ELECT, CarData) ->
   {next_state, election, CarData, [{reply, From, ?BULLY_ANS}]};
 discover(cast, ?BULLY_COORD, CarData) ->
-  %% Avendo implementato il Bully come da libro questo stato dovrebbe essere un errore
+  %% Avendo implementato il Bully come da libro questo stato dovrebbe essere un
+  %% errore
   {next_state, election, CarData};
 
 discover(info, Msg, CarData) ->
-  print(CarData, "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p", [?FUNCTION_NAME, Msg]),
+  print(CarData,
+        "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p",
+        [?FUNCTION_NAME, Msg]),
   {next_state, discover, CarData};
 discover(A, B, C) ->
   print(C, "EventType: ~p Content: ~p", [A, B]).
@@ -346,8 +299,8 @@ election(enter, _OldState, CarData) ->
                              fun({_, Ans}) -> Ans =:= ?BULLY_ANS end,
                              Answers
                             ),
-  %% Se BullyANs è vuoto allora sono il leader
-  %% Se sono il leader non ncessito di un election timeout
+  %% Se BullyAns è vuoto allora sono il leader
+  %% Se sono il leader non necessito di un election timeout
   {IsLeader, ElectionTimeOut} = bool(is_empty(BullyAns),
                                      {true, 0},
                                      {false, ?STATE_ELECTION_TIMEOUT}),
@@ -364,17 +317,13 @@ election(state_timeout, ?ELECT_TM, CarData = #cardata{isLeader=false}) ->
   {next_state, discover, NewCarData};
 
 election(cast, {?DISC, {FromCar, _Route}}, CarData) ->
-  % salvo id macchina da cui ho ricevuto disc
-  % Invio hello al mittente, segnalo che ci sono anche io.
+  %% Invio wait al mittente, segnalo che c'è un elezione in corso
   send_wait(FromCar, get_name(CarData), "i'm in election state"),
-  % salvo id macchina da cui ho ricevuto disc
   {keep_state, CarData};
 
-%% TODO: un po tutto quanto... da implementare i messaggi di wait
 
 election(cast, {?HELLO, {FromCar, _Route}}, CarData) ->
-  % salvo id macchina da cui ho ricevuto disc
-  % Invio hello al mittente, segnalo che ci sono anche io.
+  %% Invio wait al mittente, segnalo che c'è un elezione in corso
   send_wait(FromCar, get_name(CarData), "I'm in election"),
   keep_state_and_data;
 
@@ -384,7 +333,9 @@ election(cast, ?BULLY_COORD, CarData) ->
   {next_state, slave, CarData};
 
 election(info, Msg, CarData) ->
-  print(CarData, "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p", [?FUNCTION_NAME, Msg]),
+  print(CarData,
+        "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p",
+        [?FUNCTION_NAME, Msg]),
   {next_state, election, CarData}.
 
 slave(enter, _OldState, CarData) ->
@@ -395,14 +346,14 @@ slave(enter, _OldState, CarData) ->
   %% OtherRoutes diventa una lista di {Car, SetRotte}
   OtherRoutes = lists:map(fun({Car, Route}) -> {Car, sets:from_list(Route)} end, get_neighbours(CarData)),
 
-  % print(CarData, "<<~s>>:: MyRoute ~p OtherRoutes ~p", [?FUNCTION_NAME, MyRoute, OtherRoutes]),
-  
+  %% print(CarData, "<<~s>>:: MyRoute ~p OtherRoutes ~p", [?FUNCTION_NAME, MyRoute, OtherRoutes]),
+
   %% Conflicts un oggetto di questo tipo: {me, [{othercar1,true},{othercar2, false}...]}
   %% in questo caso ho che othercar1 non ha conflitti con me, mentre othercar2 è in conflitto
   NewCarData = increment_priority(CarData),
   Conflicts = {{get_name(NewCarData), get_priority(NewCarData)}, lists:map(fun({Car, Route}) -> {Car, sets:is_disjoint(MyRoute, Route)} end, OtherRoutes)},
-  
-  print(NewCarData, "<<~s>>:: Conflicts ~p", [?FUNCTION_NAME, Conflicts]), 
+
+  print(NewCarData, "<<~s>>:: Conflicts ~p", [?FUNCTION_NAME, Conflicts]),
   {keep_state, NewCarData};
 
 slave(cast,{?DISC, {FromCar, _Route}}, CarData) ->
@@ -428,13 +379,13 @@ master(enter, _OldState, CarData) ->
   OtherRoutes = lists:map(fun({Car, Route}) -> {Car, sets:from_list(Route)} end, get_neighbours(CarData)),
 
   % print(CarData, "<<~s>>:: MyRoute ~p OtherRoutes ~p", [?FUNCTION_NAME, MyRoute, OtherRoutes]),
-  
+
   %% Conflicts un oggetto di questo tipo: {{me, priority}, [{othercar1,true},{othercar2, false}...]}
   %% in questo caso ho che othercar1 non ha conflitti con me, mentre othercar2 è in conflitto
   NewCarData = increment_priority(CarData),
   Conflicts = {{get_name(NewCarData), get_priority(NewCarData)}, lists:map(fun({Car, Route}) -> {Car, sets:is_disjoint(MyRoute, Route)} end, OtherRoutes)},
-  
-  print(NewCarData, "<<~s>>:: Conflicts ~p", [?FUNCTION_NAME, Conflicts]), 
+
+  print(NewCarData, "<<~s>>:: Conflicts ~p", [?FUNCTION_NAME, Conflicts]),
   {keep_state, NewCarData};
 
 master({call, From}, ?BULLY_ELECT, _CarData) ->
