@@ -191,8 +191,7 @@ get_vertex_label(G, V) ->
   digraph:vertex(G#graph.graph, V).
 
 add_vertex(G, V) ->
-  {Node,_,_} = V,
-  digraph:add_vertex(G#graph.graph, Node, V).
+  digraph:add_vertex(G#graph.graph, V).
 
 add_vertex(G, V, Label) ->
   digraph:add_vertex(G#graph.graph, V, Label).
