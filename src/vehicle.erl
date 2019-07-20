@@ -21,6 +21,7 @@
 -define(DISC_TM, disc_tm).
 -define(ELECT_TM, elect_tm).
 -define(MFETCH_TM, mfetch_tm).
+-define(SLAVE_TM, slave_tm).
 
 %% Evento scatenato quando la auto vuole muoversi alla prossima posizione
 -define(CAR_MV, car_mv).
@@ -32,6 +33,8 @@
 -define(BULLY_NO_ANS, no_ans).
 
 -define(CONFLICT, conflict).
+-define(GREEN, green).
+-define(RED, red).
 
 %% Eventi sensoristica
 -define(POSFREE_RESP,posfree_resp).
@@ -41,13 +44,14 @@
 -define(STATE_ELECTION_TIMEOUT, 5000).
 -define(BULLY_ANSWER_TIMEOUT, 1000).
 -define(MASTER_FETCH_TIMEOUT, 5000).
+-define(SLAVE_TIMEOUT, 10000).
 
-
+-define(CROSSING_SPEED, 5000).
 %% Messaggio richiesta movimento veicolo
 
 -export([start_link/1]).
 -export([init/1, callback_mode/0, terminate/3]).
--export([inqueue/3, discover/3, election/3, slave/3, master/3]).
+-export([inqueue/3, discover/3, election/3, slave/3, master/3, crossing/3]).
 %% -export([print/3]).
 
 %% tupla contenente tutte le info che l'auto si porta dietro tra i vari stati
@@ -95,7 +99,7 @@ start_link(Data) ->
 init(CarData) ->
   print(CarData, "<<~s>> Car SPAWNED!", [?FUNCTION_NAME]),
   print(CarData, "<<~s>> Car Data is ~p", [?FUNCTION_NAME, CarData]),
-  {ok, inqueue, CarData, [{timeout, 2000, ?CAR_MV}]}.
+  {ok, inqueue, CarData}.
 
 
 get_neighbours(CarData) ->
@@ -141,11 +145,16 @@ get_conflicts(CarData) ->
 
 get_master(CarData) ->
   CarData#cardata.leader.
+
+get_speed(CarData) ->
+  CarData#cardata.speed.
 %% Rimuovo duplicati da una lista
 rem_dups(List) ->
     Set = sets:from_list(List),
     sets:to_list(Set).
 
+reset_election_data(CarData) ->
+  CarData#cardata{neighbourPids = [], isLeader = false, conflictGraph = [],  leader = undefined}.
 %% Se Cond è true ritorna X, altrimenti ritorna Y
 bool(Cond, X, Y) ->
   if
@@ -196,6 +205,11 @@ send_bully_elect(Car) ->
 send_bully_coord(Car, Master) ->
   gen_statem:cast(Car, {?BULLY_COORD, Master}).
 
+send_green(Car) ->
+  gen_statem:cast(Car, ?GREEN).
+
+send_red(Car) ->
+  gen_statem:cast(Car, ?RED).
 
 
 % Conflicts [ {car3,2,[car4,car1,car2]}, {car1,1,[car4,car3,car2]}, {car4,0,[car3,car1,car2]}, {car2,0,[car4,car3,car1]}]
@@ -220,7 +234,7 @@ mis([H | Conflicts], GreenList) ->
 
 inqueue(enter, _OldState, CarData) ->
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
-  {keep_state, CarData};
+  {keep_state, CarData, [{state_timeout, get_speed(CarData), ?CAR_MV}]};
 
 inqueue(cast, {?DISC, _FromCar}, CarData) ->
   print(CarData,
@@ -233,12 +247,14 @@ inqueue(cast, {?DISC, _FromCar}, CarData) ->
 
 %% Se ricevo un timeout generico di tipo ?CAR_MV significa che l'auto vorrebbe
 %% muoversi, dunque devo interrogare sensore prossimità
-inqueue(timeout, ?CAR_MV, CarData) ->
+inqueue(state_timeout, ?CAR_MV, CarData) ->
   print(CarData,
         "<<~s>>:: Received event ~p. I Will query proximity sensor.",
         [?FUNCTION_NAME, ?CAR_MV]),
-  MvTimeOut = {timeout, CarData#cardata.speed, ?CAR_MV},
+  MvTimeOut = {state_timeout, CarData#cardata.speed, ?CAR_MV},
   {NextNode, NextNodeType} = next_pos(CarData),
+  {NowNode, _} = current_pos(CarData),
+
   %% chiedo al sensore se la posizione davanti e' libera
   IsFree = dim_env:req_prox_sensor_data(get_name(CarData), NextNode),
   print(CarData,
@@ -247,6 +263,9 @@ inqueue(timeout, ?CAR_MV, CarData) ->
   case {IsFree, NextNodeType} of
     {false, _} ->
       {next_state, inqueue, CarData, [MvTimeOut]};
+    {true, arrived} -> 
+      dim_env:delete_car(get_name(CarData), NowNode),
+      stop;
     {true, tail_node} ->
       print(CarData, "Moving to next node", []),
       NewCarData = move_to_next_pos(CarData),
@@ -270,7 +289,7 @@ inqueue(info, Msg, CarData) ->
 
 discover(enter, _OldState, CarData) ->
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
-  NewCarData = reset_neighbours(CarData),
+  NewCarData = reset_election_data(CarData),
   dim_env:broadcast_disc({get_name(NewCarData), get_route(NewCarData)}),
   {keep_state,NewCarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]};
 
@@ -400,14 +419,26 @@ slave(enter, _OldState, CarData) ->
   print(CarData, "<<~s>>:: Conflicts ~p", [?FUNCTION_NAME, ConflictsMessage]),
 
   send_conflict(get_master(CarData), ConflictsMessage),
-  {keep_state, CarData};
+  {keep_state, CarData, [{state_timeout, ?SLAVE_TIMEOUT, ?SLAVE_TM}]};
+
+slave(state_timeout, ?SLAVE_TM, CarData) ->
+  print(CarData, "<<~s>>:: Master did not send any instruction.", [?FUNCTION_NAME]),
+  {next_state, discover, CarData};
 
 slave(cast,{?DISC, {FromCar, _Route}}, CarData) ->
   %% Invio wait al mittente
   send_wait(FromCar, get_name(CarData), "I'm a SLAVE"),
   keep_state_and_data;
-slave(cast, _, _) ->
-  keep_state_and_data;
+
+
+slave(cast, ?GREEN, CarData) ->
+  print(CarData, "<<~s>>:: Received Msg ~p", [?FUNCTION_NAME, ?GREEN]),
+  {next_state, crossing, CarData};
+
+slave(cast, ?RED, CarData) ->
+  print(CarData, "<<~s>>:: Received Msg ~p", [?FUNCTION_NAME, ?RED]),
+  NewCarData = increment_priority(CarData),
+  {next_state, discover, NewCarData};
 
 slave({call, From}, ?BULLY_ELECT, _CarData) ->
   {keep_state_and_data, [{reply, From, ?BULLY_ANS}]};
@@ -468,12 +499,28 @@ master(state_timeout, ?MFETCH_TM, CarData) ->
   print(CarData, "<<~s>>:: GreenList: ~p", [?FUNCTION_NAME, GreenCars]),
   RedCars = AllCars -- GreenCars,
   print(CarData, "<<~s>>:: RedList: ~p", [?FUNCTION_NAME, RedCars]),
+
+
+
+  lists:foreach(fun(Car) -> send_green(Car) end, GreenCars),
+  lists:foreach(fun(Car) -> send_red(Car) end, RedCars),
+
   keep_state_and_data;
 
 master(cast, {?CONFLICT, Data}, CarData) ->
   print(CarData, "<<~s>>:: Received conflict msg from slave ~p", [?FUNCTION_NAME, Data]),
   NewCarData = add_conflict(CarData, Data),
   {keep_state, NewCarData};
+
+master(cast, ?GREEN, CarData) ->
+  print(CarData, "<<~s>>:: Received Msg ~p", [?FUNCTION_NAME, ?GREEN]),
+  {next_state, crossing, CarData};
+
+master(cast, ?RED, CarData) ->
+  print(CarData, "<<~s>>:: Received Msg ~p", [?FUNCTION_NAME, ?RED]),
+  NewCarData = increment_priority(CarData),
+  {next_state, discover, NewCarData};
+
 
 master({call, From}, ?BULLY_ELECT, _CarData) ->
   {keep_state_and_data, [{reply, From, ?BULLY_ANS}]};
@@ -483,12 +530,46 @@ master(cast,{?DISC, {FromCar, _Route}}, CarData) ->
   send_wait(FromCar, get_name(CarData), "I'm the LEADER"),
   keep_state_and_data;
 
-master(cast, _, _) ->
-  keep_state_and_data;
 master(info, From, CarData) ->
   From ! CarData,
   keep_state_and_data.
 
+crossing(enter, _OldState, CarData) ->
+  print(CarData, "<<~s>>:: I Can go", [?FUNCTION_NAME]),
+  NewCarData = reset_election_data(CarData),
+  {keep_state, NewCarData, [{state_timeout, ?CROSSING_SPEED, ?CAR_MV}]};
+
+
+crossing(cast,{?DISC, {FromCar, _Route}}, CarData) ->
+  send_wait(FromCar, get_name(CarData), "I'm the LEADER"),
+  keep_state_and_data;
+
+
+crossing(state_timeout, ?CAR_MV, CarData) ->
+  print(CarData,
+        "<<~s>>:: Received event ~p. I Will query proximity sensor.",
+        [?FUNCTION_NAME, ?CAR_MV]),
+  MvTimeOut = {state_timeout, ?CROSSING_SPEED, ?CAR_MV},
+  {NextNode, NextNodeType} = next_pos(CarData),
+  %% chiedo al sensore se la posizione davanti e' libera
+  IsFree = dim_env:req_prox_sensor_data(get_name(CarData), NextNode),
+  print(CarData,
+        "<<~s>>:: Received Event posfree_resp ~p",
+        [?FUNCTION_NAME, IsFree]),
+  case {IsFree, NextNodeType} of
+    {false, _} ->
+      {keep_state, CarData, [MvTimeOut]};
+    {true, out_node} ->
+      print(CarData, "Moving to next node", []),
+      NewCarData = move_to_next_pos(CarData),
+      {next_state, inqueue, NewCarData, [MvTimeOut]};
+    {true, cross_node} ->
+      print(CarData, "Moving to next node and going into <<crossing>>", []),
+      NewCarData = move_to_next_pos(CarData),
+      {keep_state, NewCarData, [MvTimeOut]};
+    Other ->
+      print(CarData, "OOOOOO <<crossing>> ~p", [Other])
+  end.
 
 terminate(_Reason, _State, _Data) ->
     ok.

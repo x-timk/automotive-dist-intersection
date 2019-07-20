@@ -2,7 +2,7 @@
 -export([t/0]).
 
 %% Export Public API genserver
--export([spawn_car/6, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3]).
+-export([spawn_car/6, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3, delete_car/2]).
 
 %% gen_event export stuff
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
@@ -45,7 +45,7 @@ create_graph(GType) ->
   graph:add_edge(G, INord2, INord1, 2),
 
   % Nord OUT
-  ONord1 = graph:add_vertex(G, o_nord1, {top_node, []}),
+  ONord1 = graph:add_vertex(G, o_nord1, {out_node, []}),
   ONord2 = graph:add_vertex(G, o_nord2, {tail_node, []}),
   ONord3 = graph:add_vertex(G, o_nord3, {tail_node, []}),
   graph:add_edge(G, ONord2, ONord3,2),
@@ -60,7 +60,7 @@ create_graph(GType) ->
   graph:add_edge(G, IEst2, IEst1, 2),
 
   % Est OUT
-  OEst1 = graph:add_vertex(G, o_est1, {top_node, []}),
+  OEst1 = graph:add_vertex(G, o_est1, {out_node, []}),
   OEst2 = graph:add_vertex(G, o_est2, {tail_node, []}),
   OEst3 = graph:add_vertex(G, o_est3, {tail_node, []}),
   graph:add_edge(G, OEst2, OEst3,2),
@@ -75,7 +75,7 @@ create_graph(GType) ->
   graph:add_edge(G, ISud2, ISud1, 2),
 
   % Sud OUT
-  OSud1 = graph:add_vertex(G, o_sud1, {top_node, []}),
+  OSud1 = graph:add_vertex(G, o_sud1, {out_node, []}),
   OSud2 = graph:add_vertex(G, o_sud2, {tail_node, []}),
   OSud3 = graph:add_vertex(G, o_sud3, {tail_node, []}),
   graph:add_edge(G, OSud2, OSud3,2),
@@ -91,7 +91,7 @@ create_graph(GType) ->
   graph:add_edge(G, IOvest2, IOvest1, 2),
 
   % Ovest OUT
-  OOvest1 = graph:add_vertex(G, o_ovest1, {top_node, []}),
+  OOvest1 = graph:add_vertex(G, o_ovest1, {out_node, []}),
   OOvest2 = graph:add_vertex(G, o_ovest2, {tail_node, []}),
   OOvest3 = graph:add_vertex(G, o_ovest3, {tail_node, []}),
   graph:add_edge(G, OOvest2, OOvest3,2),
@@ -184,7 +184,8 @@ aux_get_car_neighboorhood(G, [H | Neighbour]) ->
 is_node_occupied(G, V) ->
   case graph:get_vertex_label(G, V) of
     {_, {_, [_ | _]}} -> true;
-    {_, {_, []}} -> false
+    {_, {_, []}} -> false;
+    false -> false
   end.
 
 %% Aggiungo macchina Car in nodo V del grafo
@@ -262,6 +263,8 @@ init(_Args) ->
   World = create_world(),
   {ok,World}.
 
+delete_car(CarName, Pos) -> 
+  gen_server:call(?MODULE, {delete_car, {CarName, Pos}}).
 
 spawn_car(CarName, CarDesc, StartPos, EndPos, Speed, Prio) ->
   gen_server:call(?MODULE, {spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed, Prio}}).
@@ -298,6 +301,11 @@ handle_call({move, {CarName, {CurrentPos, NextPos}}}, _From, W) ->
   print("Received move", []),
   %% Stampo posizione auto nel grafo
   print("~p", [get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))]),
+  {reply, ok, W};
+
+handle_call({delete_car, {CarName, Pos}}, _From, W) ->
+  print("DELETE REQUEST",[]),
+  delete_car_from_vertex(W#world.undir, Pos, CarName),
   {reply, ok, W};
 
 handle_call({spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed, Prio}}, _From, W) ->
