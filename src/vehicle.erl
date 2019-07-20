@@ -20,6 +20,7 @@
 %% Timeout events
 -define(DISC_TM, disc_tm).
 -define(ELECT_TM, elect_tm).
+-define(MFETCH_TM, mfetch_tm).
 
 %% Evento scatenato quando la auto vuole muoversi alla prossima posizione
 -define(CAR_MV, car_mv).
@@ -30,6 +31,8 @@
 -define(BULLY_ANS, ans).
 -define(BULLY_NO_ANS, no_ans).
 
+-define(CONFLICT, conflict).
+
 %% Eventi sensoristica
 -define(POSFREE_RESP,posfree_resp).
 
@@ -37,6 +40,7 @@
 -define(STATE_DISCOVER_TIMEOUT, 5000).
 -define(STATE_ELECTION_TIMEOUT, 5000).
 -define(BULLY_ANSWER_TIMEOUT, 1000).
+-define(MASTER_FETCH_TIMEOUT, 5000).
 
 
 %% Messaggio richiesta movimento veicolo
@@ -55,7 +59,9 @@
     neighbourPids = [],
     speed = 2000,
     isLeader = false,
-    priority = 0
+    leader,
+    priority = 0,
+    conflictGraph = []
     }).
 
 
@@ -110,6 +116,9 @@ add_neighbour(CarData, Car) ->
   NewNeighbours = rem_dups([ Car | Neighbours]),
   CarData#cardata{neighbourPids = NewNeighbours}.
 
+add_conflict(CarData, Conflict) ->
+  CarData#cardata{conflictGraph = [Conflict | CarData#cardata.conflictGraph]}.
+
 %% Restituisco tupla {nodo, tipo}
 current_pos(#cardata{route=[Pos | _]}) -> Pos;
 current_pos(_) -> {finish, arrived}.
@@ -127,6 +136,11 @@ get_name(CarData) ->
 get_route(CarData) ->
   CarData#cardata.route.
 
+get_conflicts(CarData) ->
+  CarData#cardata.conflictGraph.
+
+get_master(CarData) ->
+  CarData#cardata.leader.
 %% Rimuovo duplicati da una lista
 rem_dups(List) ->
     Set = sets:from_list(List),
@@ -169,6 +183,9 @@ send_hello(Car, FromCar) ->
 send_wait(Car, FromCar, Reason) ->
   gen_statem:cast(Car, {?WAIT, {FromCar, Reason}}).
 
+send_conflict(Master, Data) -> 
+  gen_statem:cast(Master, {?CONFLICT, Data}).
+
 send_bully_elect(Car) ->
   try
     gen_statem:call(Car, ?BULLY_ELECT, ?BULLY_ANSWER_TIMEOUT)
@@ -176,8 +193,8 @@ send_bully_elect(Car) ->
     exit:{timeout,_} -> ?BULLY_NO_ANS
   end.
 
-send_bully_coord(Car) ->
-  gen_statem:cast(Car, ?BULLY_COORD).
+send_bully_coord(Car, Master) ->
+  gen_statem:cast(Car, {?BULLY_COORD, Master}).
 
 inqueue(enter, _OldState, CarData) ->
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
@@ -270,10 +287,12 @@ discover(cast, {?WAIT, {_FromCar, _Reason}}, CarData) ->
 
 discover({call, From}, ?BULLY_ELECT, CarData) ->
   {next_state, election, CarData, [{reply, From, ?BULLY_ANS}]};
-discover(cast, ?BULLY_COORD, CarData) ->
+
+discover(cast, {?BULLY_COORD, Master}, CarData) ->
   %% Avendo implementato il Bully come da libro questo stato dovrebbe essere un
   %% errore
-  {next_state, election, CarData};
+  NewCarData = CarData#cardata{leader = Master},
+  {next_state, slave, NewCarData};
 
 discover(info, Msg, CarData) ->
   print(CarData,
@@ -329,8 +348,10 @@ election(cast, {?HELLO, {FromCar, _Route}}, CarData) ->
 
 election({call, From}, ?BULLY_ELECT, _CarData) ->
   {keep_state_and_data, [{reply, From, ?BULLY_ANS}]};
-election(cast, ?BULLY_COORD, CarData) ->
-  {next_state, slave, CarData};
+
+election(cast, {?BULLY_COORD, Master}, CarData) ->
+  NewCarData = CarData#cardata{leader = Master},
+  {next_state, slave, NewCarData};
 
 election(info, Msg, CarData) ->
   print(CarData,
@@ -346,15 +367,18 @@ slave(enter, _OldState, CarData) ->
   %% OtherRoutes diventa una lista di {Car, SetRotte}
   OtherRoutes = lists:map(fun({Car, Route}) -> {Car, sets:from_list(Route)} end, get_neighbours(CarData)),
 
-  %% print(CarData, "<<~s>>:: MyRoute ~p OtherRoutes ~p", [?FUNCTION_NAME, MyRoute, OtherRoutes]),
+  ConflictList = lists:filtermap(fun({Car, Route}) -> 
+                      case not sets:is_disjoint(MyRoute, Route) of 
+                        false -> false;
+                        true -> {true, Car}
+                      end
+                    end,
+             OtherRoutes),
+  ConflictsMessage = {get_name(CarData), get_priority(CarData), ConflictList},
+  print(CarData, "<<~s>>:: Conflicts ~p", [?FUNCTION_NAME, ConflictsMessage]),
 
-  %% Conflicts un oggetto di questo tipo: {me, [{othercar1,true},{othercar2, false}...]}
-  %% in questo caso ho che othercar1 non ha conflitti con me, mentre othercar2 è in conflitto
-  NewCarData = increment_priority(CarData),
-  Conflicts = {{get_name(NewCarData), get_priority(NewCarData)}, lists:map(fun({Car, Route}) -> {Car, sets:is_disjoint(MyRoute, Route)} end, OtherRoutes)},
-
-  print(NewCarData, "<<~s>>:: Conflicts ~p", [?FUNCTION_NAME, Conflicts]),
-  {keep_state, NewCarData};
+  send_conflict(get_master(CarData), ConflictsMessage),
+  {keep_state, CarData};
 
 slave(cast,{?DISC, {FromCar, _Route}}, CarData) ->
   %% Invio wait al mittente
@@ -372,7 +396,7 @@ slave(info, From, CarData) ->
 
 master(enter, _OldState, CarData) ->
   print(CarData, "Master ready to coordinate", []),
-  lists:map(fun({Car,_}) -> send_bully_coord(Car) end, CarData#cardata.neighbourPids),
+  lists:map(fun({Car,_}) -> send_bully_coord(Car, get_name(CarData)) end, CarData#cardata.neighbourPids),
   MyRoute = sets:from_list(get_route(CarData)),
 
   %% OtherRoutes diventa una lista di {Car, SetRotte}
@@ -382,10 +406,32 @@ master(enter, _OldState, CarData) ->
 
   %% Conflicts un oggetto di questo tipo: {{me, priority}, [{othercar1,true},{othercar2, false}...]}
   %% in questo caso ho che othercar1 non ha conflitti con me, mentre othercar2 è in conflitto
-  NewCarData = increment_priority(CarData),
-  Conflicts = {{get_name(NewCarData), get_priority(NewCarData)}, lists:map(fun({Car, Route}) -> {Car, sets:is_disjoint(MyRoute, Route)} end, OtherRoutes)},
+  % NewCarData = increment_priority(CarData),
 
-  print(NewCarData, "<<~s>>:: Conflicts ~p", [?FUNCTION_NAME, Conflicts]),
+  ConflictList = lists:filtermap(fun({Car, Route}) -> 
+                      case not sets:is_disjoint(MyRoute, Route) of 
+                        false -> false;
+                        true -> {true, Car}
+                      end
+                    end,
+             OtherRoutes),
+
+  ConflictsMessage = {get_name(CarData), get_priority(CarData), ConflictList},
+
+  print(CarData, "<<~s>>:: Conflicts ~p", [?FUNCTION_NAME, ConflictsMessage]),
+
+  %% Sono il master e aggiungo direttamente la mia lista di conflitti
+  %% Gli slave me la manderanno tramite api
+  NewCarData = add_conflict(CarData, ConflictsMessage),
+  {keep_state, NewCarData, [{state_timeout, ?MASTER_FETCH_TIMEOUT, ?MFETCH_TM}]};
+
+master(state_timeout, ?MFETCH_TM, CarData) ->
+  print(CarData, "<<~s>>:: Overall Conflicts: ~p", [?FUNCTION_NAME, get_conflicts(CarData)]),
+  keep_state_and_data;
+
+master(cast, {?CONFLICT, Data}, CarData) ->
+  print(CarData, "<<~s>>:: Received conflict msg from slave ~p", [?FUNCTION_NAME, Data]),
+  NewCarData = add_conflict(CarData, Data),
   {keep_state, NewCarData};
 
 master({call, From}, ?BULLY_ELECT, _CarData) ->
