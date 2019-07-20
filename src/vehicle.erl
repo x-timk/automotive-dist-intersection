@@ -60,7 +60,7 @@
     speed = 2000,
     isLeader = false,
     leader,
-    priority = 0,
+    priority,
     conflictGraph = []
     }).
 
@@ -84,8 +84,8 @@ callback_mode() ->
 %% 4) Lista di eventuali opzioni avanzate per la state machine
 %% L'idea è che quando faccio spawn di una macchina la lancio con i parametri {Env, Name, Desc, Route, Speed}
 start_link(Data) ->
-  {Env, Name, Desc, Route, Speed} = Data,
-  CarData = #cardata{env = Env, name = Name, desc = Desc, route = Route, neighbourPids = [], speed = Speed},
+  {Env, Name, Desc, Route, Speed, Prio} = Data,
+  CarData = #cardata{env = Env, name = Name, desc = Desc, route = Route, neighbourPids = [], speed = Speed, priority = Prio},
   gen_statem:start_link({local,CarData#cardata.name}, ?MODULE, CarData, []).
 
 
@@ -195,6 +195,28 @@ send_bully_elect(Car) ->
 
 send_bully_coord(Car, Master) ->
   gen_statem:cast(Car, {?BULLY_COORD, Master}).
+
+
+
+% Conflicts [ {car3,2,[car4,car1,car2]}, {car1,1,[car4,car3,car2]}, {car4,0,[car3,car1,car2]}, {car2,0,[car4,car3,car1]}]
+% CarConflicts [car1, car2, car3] 
+
+%% Maximal indipendent setù
+
+mis([], GreenList) ->
+  GreenList;
+
+mis([H | Conflicts], GreenList) ->
+  {Car,_,CarConflicts} = H,
+
+  NewGreenList = [Car | GreenList],
+
+  F = fun(Elem, Acc) -> 
+    lists:keydelete(Elem, 1, Acc) end,
+
+  NewConflicts = lists:foldl(F, Conflicts, CarConflicts),
+  mis(NewConflicts, NewGreenList).
+
 
 inqueue(enter, _OldState, CarData) ->
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
@@ -427,6 +449,25 @@ master(enter, _OldState, CarData) ->
 
 master(state_timeout, ?MFETCH_TM, CarData) ->
   print(CarData, "<<~s>>:: Overall Conflicts: ~p", [?FUNCTION_NAME, get_conflicts(CarData)]),
+  SortedList = lists:sort(
+    fun({_Car1, Prio1, _Elem1}, {_Car2, Prio2, _Elem2}) ->
+      Prio1 > Prio2
+    end,
+    get_conflicts(CarData)
+    ),
+  print(CarData, "<<~s>>:: Sorted Conflicts: ~p", [?FUNCTION_NAME, SortedList]),
+
+  AllCars = lists:map(
+    fun({Car, _, _}) ->
+      Car
+    end,
+    SortedList
+    ),
+
+  GreenCars = mis(SortedList, []),
+  print(CarData, "<<~s>>:: GreenList: ~p", [?FUNCTION_NAME, GreenCars]),
+  RedCars = AllCars -- GreenCars,
+  print(CarData, "<<~s>>:: RedList: ~p", [?FUNCTION_NAME, RedCars]),
   keep_state_and_data;
 
 master(cast, {?CONFLICT, Data}, CarData) ->

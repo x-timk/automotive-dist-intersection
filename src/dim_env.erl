@@ -2,7 +2,7 @@
 -export([t/0]).
 
 %% Export Public API genserver
--export([spawn_car/5, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3]).
+-export([spawn_car/6, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3]).
 
 %% gen_event export stuff
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
@@ -249,10 +249,10 @@ get_vertex_cars_array(G, [H|T]) ->
 %% VStart: posizione iniziale auto
 %% VStop: posizione finale
 %% Speed: velocita' movimento (es: con un valore 2000 l'auto tenta di muoversi ogni 2 secondi)
-add_car_to_graph(W, Name, Desc, VStart, Vstop, Speed) ->
+add_car_to_graph(W, Name, Desc, VStart, Vstop, Speed, Prio) ->
   Path = get_min_path(W#world.dir, VStart, Vstop),
   add_car_to_vertex(W#world.undir, VStart, Name),
-  vehicle:start_link({?MODULE, Name, Desc, get_vertex_type_array(W#world.dir, Path), Speed}).
+  vehicle:start_link({?MODULE, Name, Desc, get_vertex_type_array(W#world.dir, Path), Speed, Prio}).
 
 
 %% Funzione per testare il funzionamento del sistema
@@ -263,8 +263,8 @@ init(_Args) ->
   {ok,World}.
 
 
-spawn_car(CarName, CarDesc, StartPos, EndPos, Speed) ->
-  gen_server:call(?MODULE, {spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed}}).
+spawn_car(CarName, CarDesc, StartPos, EndPos, Speed, Prio) ->
+  gen_server:call(?MODULE, {spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed, Prio}}).
 
 broadcast_disc(FromCar) ->
   gen_server:cast(?MODULE, {disc, FromCar}).
@@ -300,9 +300,9 @@ handle_call({move, {CarName, {CurrentPos, NextPos}}}, _From, W) ->
   print("~p", [get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))]),
   {reply, ok, W};
 
-handle_call({spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed}}, _From, W) ->
+handle_call({spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed, Prio}}, _From, W) ->
   print("SPAWN REQUEST",[]),
-  add_car_to_graph(W, CarName, CarDesc, StartPos, EndPos, Speed),
+  add_car_to_graph(W, CarName, CarDesc, StartPos, EndPos, Speed, Prio),
   print("~p", [get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))]),
   {reply, CarName, W}.
 
@@ -317,16 +317,16 @@ terminate(_Args, _Fd) ->
 t() ->
   World = create_world(),
   gen_server:start_link({local, ?MODULE}, dim_env, World, []),
-  dim_env:spawn_car(car1, "LanciaDelta", i_nord3, o_sud3, 1000),
+  dim_env:spawn_car(car1, "LanciaDelta", i_nord3, o_sud3, 1000, 1),
   timer:sleep(500),
 
-  dim_env:spawn_car(car2, "LanciaDelta", i_est3, o_sud3, 1000),
+  dim_env:spawn_car(car2, "LanciaDelta", i_est3, o_sud3, 1000, 0),
   timer:sleep(500),
 
-  dim_env:spawn_car(car3, "LanciaDelta", i_sud3, o_sud3, 1000),
+  dim_env:spawn_car(car3, "LanciaDelta", i_sud3, o_nord3, 1000, 2),
   timer:sleep(500),
 
-  dim_env:spawn_car(car4, "LanciaDelta", i_ovest3, o_sud3, 1000),
+  dim_env:spawn_car(car4, "LanciaDelta", i_ovest3, o_sud3, 1000, 0),
   timer:sleep(500),
 
   % dim_env:spawn_car(car5, "LanciaDelta", i_nord3, o_est3, 1000),
