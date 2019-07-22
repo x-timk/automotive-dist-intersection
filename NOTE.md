@@ -1,3 +1,10 @@
+# TODO
+
+- [ ] Aggiungere fault-detection ai veicoli in coda
+- [ ] Aggiungere spawn random delle macchine
+- [ ] Aggiungere interfaccia grafica
+
+
 # Assunzioni
 
 ## Environment
