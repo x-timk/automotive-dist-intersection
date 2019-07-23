@@ -1,5 +1,5 @@
 -module(dim_env).
--export([t/0]).
+-export([go/0,t/0]).
 
 %% Export Public API genserver
 -export([spawn_car/6, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3, delete_car/2]).
@@ -43,45 +43,45 @@ create_graph(GType) ->
   INord1 = graph:add_vertex(G, i_nord1, {top_node, []}),
   INord2 = graph:add_vertex(G, i_nord2, {tail_node, []}),
   INord3 = graph:add_vertex(G, i_nord3, {tail_node, []}),
-  graph:add_edge(G, INord3, INord2, 2),
-  graph:add_edge(G, INord2, INord1, 2),
+  graph:add_edge(G, INord3, INord2, 1),
+  graph:add_edge(G, INord2, INord1, 1),
 
   % Nord OUT
   ONord1 = graph:add_vertex(G, o_nord1, {out_node, []}),
   ONord2 = graph:add_vertex(G, o_nord2, {tail_node, []}),
   ONord3 = graph:add_vertex(G, o_nord3, {tail_node, []}),
-  graph:add_edge(G, ONord2, ONord3,2),
-  graph:add_edge(G, ONord1, ONord2,2),
+  graph:add_edge(G, ONord2, ONord3, 1),
+  graph:add_edge(G, ONord1, ONord2, 1),
 
   % EST
   % Est IN
   IEst1 = graph:add_vertex(G, i_est1, {top_node, []}),
   IEst2 = graph:add_vertex(G, i_est2, {tail_node, []}),
   IEst3 = graph:add_vertex(G, i_est3, {tail_node, []}),
-  graph:add_edge(G, IEst3, IEst2, 2),
-  graph:add_edge(G, IEst2, IEst1, 2),
+  graph:add_edge(G, IEst3, IEst2, 1),
+  graph:add_edge(G, IEst2, IEst1, 1),
 
   % Est OUT
   OEst1 = graph:add_vertex(G, o_est1, {out_node, []}),
   OEst2 = graph:add_vertex(G, o_est2, {tail_node, []}),
   OEst3 = graph:add_vertex(G, o_est3, {tail_node, []}),
-  graph:add_edge(G, OEst2, OEst3,2),
-  graph:add_edge(G, OEst1, OEst2,2),
+  graph:add_edge(G, OEst2, OEst3, 1),
+  graph:add_edge(G, OEst1, OEst2, 1),
 
   % SUD
   % Sud IN
   ISud1 = graph:add_vertex(G, i_sud1, {top_node, []}),
   ISud2 = graph:add_vertex(G, i_sud2, {tail_node, []}),
   ISud3 = graph:add_vertex(G, i_sud3, {tail_node, []}),
-  graph:add_edge(G, ISud3, ISud2, 2),
-  graph:add_edge(G, ISud2, ISud1, 2),
+  graph:add_edge(G, ISud3, ISud2, 1),
+  graph:add_edge(G, ISud2, ISud1, 1),
 
   % Sud OUT
   OSud1 = graph:add_vertex(G, o_sud1, {out_node, []}),
   OSud2 = graph:add_vertex(G, o_sud2, {tail_node, []}),
   OSud3 = graph:add_vertex(G, o_sud3, {tail_node, []}),
-  graph:add_edge(G, OSud2, OSud3,2),
-  graph:add_edge(G, OSud1, OSud2,2),
+  graph:add_edge(G, OSud2, OSud3, 1),
+  graph:add_edge(G, OSud1, OSud2, 1),
 
 
   % OVEST
@@ -89,15 +89,15 @@ create_graph(GType) ->
   IOvest1 = graph:add_vertex(G, i_ovest1, {top_node, []}),
   IOvest2 = graph:add_vertex(G, i_ovest2, {tail_node, []}),
   IOvest3 = graph:add_vertex(G, i_ovest3, {tail_node, []}),
-  graph:add_edge(G, IOvest3, IOvest2, 2),
-  graph:add_edge(G, IOvest2, IOvest1, 2),
+  graph:add_edge(G, IOvest3, IOvest2, 1),
+  graph:add_edge(G, IOvest2, IOvest1, 1),
 
   % Ovest OUT
   OOvest1 = graph:add_vertex(G, o_ovest1, {out_node, []}),
   OOvest2 = graph:add_vertex(G, o_ovest2, {tail_node, []}),
   OOvest3 = graph:add_vertex(G, o_ovest3, {tail_node, []}),
-  graph:add_edge(G, OOvest2, OOvest3,2),
-  graph:add_edge(G, OOvest1, OOvest2,2),
+  graph:add_edge(G, OOvest2, OOvest3, 1),
+  graph:add_edge(G, OOvest1, OOvest2, 1),
 
 
   %% CENTRO
@@ -108,40 +108,57 @@ create_graph(GType) ->
   CCentro = graph:add_vertex(G, c_center, {cross_node, []}),
 
   %% Collegamenti Nord <-> Centro
-  graph:add_edge(G, INord1, CNordOvest, 2),
-  graph:add_edge(G, CNordEst, ONord1, 2),
+  graph:add_edge(G, INord1, CNordOvest, 1),
+  graph:add_edge(G, CNordEst, ONord1, 1),
 
   %% Collegamenti Est <-> Centro
-  graph:add_edge(G, IEst1, CNordEst, 2),
-  graph:add_edge(G, CSudEst, OEst1, 2),
+  graph:add_edge(G, IEst1, CNordEst, 1),
+  graph:add_edge(G, CSudEst, OEst1, 1),
 
   %% Collegamenti Sud <-> Centro
-  graph:add_edge(G, ISud1, CSudEst, 2),
-  graph:add_edge(G, CSudOvest, OSud1, 2),
+  graph:add_edge(G, ISud1, CSudEst, 1),
+  graph:add_edge(G, CSudOvest, OSud1, 1),
 
   %% Collegamenti Ovest <-> Centro
-  graph:add_edge(G, IOvest1, CSudOvest, 2),
-  graph:add_edge(G, CNordOvest, OOvest1, 2),
+  graph:add_edge(G, IOvest1, CSudOvest, 1),
+  graph:add_edge(G, CNordOvest, OOvest1, 1),
+
+
 
 
   %% Collegamenti Centrali
 
-  graph:add_edge(G, CNordOvest, CSudOvest, 2),
+  % graph:add_edge(G, CNordOvest, CSudOvest, 2),
   graph:add_edge(G, CNordOvest, CCentro, 1.414),
 
-  graph:add_edge(G, CSudOvest, CSudEst, 2),
+  % graph:add_edge(G, CSudOvest, CSudEst, 2),
   graph:add_edge(G, CSudOvest, CCentro, 1.414),
 
-  graph:add_edge(G, CSudEst, CNordEst, 2),
+  % graph:add_edge(G, CSudEst, CNordEst, 2),
   graph:add_edge(G, CSudEst, CCentro, 1.414),
 
-  graph:add_edge(G, CNordEst, CNordOvest, 2),
+  % graph:add_edge(G, CNordEst, CNordOvest, 2),
   graph:add_edge(G, CNordEst, CCentro, 1.414),
 
   graph:add_edge(G, CCentro, CNordOvest,1.414),
   graph:add_edge(G, CCentro, CNordEst,1.414),
   graph:add_edge(G, CCentro, CSudOvest,1.414),
   graph:add_edge(G, CCentro, CSudEst,1.414),
+
+  CNord = graph:add_vertex(G, c_nord, {cross_node, []}),
+  CEst = graph:add_vertex(G, c_est, {cross_node, []}),
+  CSud = graph:add_vertex(G, c_sud, {cross_node, []}),
+  COvest = graph:add_vertex(G, c_ovest, {cross_node, []}),
+
+  graph:add_edge(G, CNordOvest, COvest, 1),
+  graph:add_edge(G, COvest, CSudOvest, 1),
+  graph:add_edge(G, CSudEst, CEst, 1),
+  graph:add_edge(G, CEst, CNordEst, 1),
+  graph:add_edge(G, CNordEst, CNord, 1),
+  graph:add_edge(G, CNord, CNordOvest, 1),
+  graph:add_edge(G, CSudOvest, CSud, 1),
+  graph:add_edge(G, CSud, CSudEst, 1),
+
 
   G.
 
@@ -259,7 +276,7 @@ add_car_to_graph(W, Name, Desc, VStart, Vstop, Speed, Prio) ->
 
 
 %% Send to java gui
-gui_update_graph(Node, Mbox, G) ->
+jgui_update_graph(Node, Mbox, G) ->
   {Mbox, Node} ! {undirgraph, {get_vertex_cars_array(G, graph:vertices(G))}}.
 
 %% gen_event stuff
@@ -305,19 +322,28 @@ handle_call({move, {CarName, {CurrentPos, NextPos}}}, _From, W) ->
   print("Received move", []),
   %% Stampo posizione auto nel grafo
   print("~p", [get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))]),
-  gui_update_graph(W#world.gui_node, W#world.gui_mbox, W#world.undir),
+  jgui_update_graph(W#world.gui_node, W#world.gui_mbox, W#world.undir),
   {reply, ok, W};
 
 handle_call({delete_car, {CarName, Pos}}, _From, W) ->
   print("DELETE REQUEST",[]),
   delete_car_from_vertex(W#world.undir, Pos, CarName),
+  jgui_update_graph(W#world.gui_node, W#world.gui_mbox, W#world.undir),
   {reply, ok, W};
 
 handle_call({spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed, Prio}}, _From, W) ->
   print("SPAWN REQUEST",[]),
-  add_car_to_graph(W, CarName, CarDesc, StartPos, EndPos, Speed, Prio),
-  print("~p", [get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))]),
-  {reply, CarName, W}.
+  Occupied = is_node_occupied(W#world.undir, StartPos),
+  case Occupied of
+    false ->
+      add_car_to_graph(W, CarName, CarDesc, StartPos, EndPos, Speed, Prio),
+      print("~p", [get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))]),
+      jgui_update_graph(W#world.gui_node, W#world.gui_mbox, W#world.undir),
+      {reply, CarName, W};
+    true ->
+      {reply, "Already occupied", W}
+    end.
+
 
 handle_info(D1, W) ->
   print("INFO D1: ~p W: ~p", [D1, W]),
@@ -327,6 +353,10 @@ handle_info(D1, W) ->
 terminate(_Args, _Fd) ->
   ok.
 
+go() ->
+  World = create_world(),
+  gen_server:start_link({local, ?MODULE}, dim_env, World, []).
+
 t() ->
 
   % gui_update_graph('jv@Altro-MB.local', mbox, {}).
@@ -334,16 +364,16 @@ t() ->
   World = create_world(),
   gen_server:start_link({local, ?MODULE}, dim_env, World, []),
   dim_env:spawn_car(car1, "LanciaDelta", i_nord3, o_sud3, 1000, 1),
-  timer:sleep(500),
+  timer:sleep(1500),
 
   dim_env:spawn_car(car2, "LanciaDelta", i_est3, o_sud3, 1000, 0),
-  timer:sleep(500),
+  timer:sleep(1500),
 
   dim_env:spawn_car(car3, "LanciaDelta", i_sud3, o_nord3, 1000, 2),
-  timer:sleep(500),
+  timer:sleep(1500),
 
   dim_env:spawn_car(car4, "LanciaDelta", i_ovest3, o_sud3, 1000, 0),
-  timer:sleep(500),
+  timer:sleep(1500),
 
 
   ok.
