@@ -2,12 +2,11 @@
 -behaviour(gen_statem).
 
 %% Export API pubbliche
--export([send_posfree_resp/2, send_disc/2]).
+-export([send_posfree_resp/2, send_disc/2, is_stalled/1]).
 
 %% Export API solo tra veicoli, valutare se serve
 % -export([send_hello/2, send_wait/3]).
 
--define(NAME, panda).
 
 %% Uso macro per definire i possibili eventi
 -define(ONTOP, ontop).
@@ -35,6 +34,7 @@
 -define(CONFLICT, conflict).
 -define(GREEN, green).
 -define(RED, red).
+-define(IS_STALLED, is_stalled).
 
 %% Eventi sensoristica
 -define(POSFREE_RESP,posfree_resp).
@@ -47,6 +47,8 @@
 -define(SLAVE_TIMEOUT, 10000).
 
 -define(CROSSING_SPEED, 5000).
+
+-define(TOWTRUCK_THRESHOLD, 5).
 %% Messaggio richiesta movimento veicolo
 
 -export([start_link/1]).
@@ -65,7 +67,8 @@
     isLeader = false,
     leader,
     priority,
-    conflictGraph = []
+    conflictGraph = [],
+    failedMovingAttempts = 0
     }).
 
 
@@ -148,6 +151,10 @@ get_master(CarData) ->
 
 get_speed(CarData) ->
   CarData#cardata.speed.
+
+get_moving_attempts(CarData) ->
+  CarData#cardata.failedMovingAttempts.
+
 %% Rimuovo duplicati da una lista
 rem_dups(List) ->
     Set = sets:from_list(List),
@@ -171,13 +178,19 @@ move_to_next_pos(CarData) ->
   {CurrentPos, _} = current_pos(CarData),
   {NextPos, _}= next_pos(CarData),
   dim_env:notify_move(get_name(CarData), CurrentPos, NextPos),
-  pop_route_leg(CarData).
+  reset_moving_attempts(pop_route_leg(CarData)).
 
 %% Da usare quando mi sono mosso per cancellare dalla rotta la posizione che ho
 %% appena lasciato: in #cardata.route ho la lista dei nodi che occuperò
 %% (compreso il nodo attuale)
 pop_route_leg(CarData = #cardata{route=Route}) ->
   CarData#cardata{route=tl(Route)}.
+
+increment_moving_attempts(CarData = #cardata{failedMovingAttempts = Attempts}) ->
+  CarData#cardata{failedMovingAttempts = Attempts + 1}.
+
+reset_moving_attempts(CarData) ->
+  CarData#cardata{failedMovingAttempts = 0}.
 
 %% Vehicle PUBLIC API
 send_disc(DestCar, FromCar) ->
@@ -211,6 +224,12 @@ send_green(Car) ->
 send_red(Car) ->
   gen_statem:cast(Car, ?RED).
 
+is_stalled(Car) ->
+  try
+    gen_statem:call(Car, ?IS_STALLED)
+  catch
+    exit:{timeout,_} -> true
+  end.
 
 % Conflicts [ {car3,2,[car4,car1,car2]}, {car1,1,[car4,car3,car2]}, {car4,0,[car3,car1,car2]}, {car2,0,[car4,car3,car1]}]
 % CarConflicts [car1, car2, car3] 
@@ -262,8 +281,16 @@ inqueue(state_timeout, ?CAR_MV, CarData) ->
         [?FUNCTION_NAME, IsFree]),
   case {IsFree, NextNodeType} of
     {false, _} ->
-      {next_state, inqueue, CarData, [MvTimeOut]};
-    {true, arrived} -> 
+      NewCarData = increment_moving_attempts(CarData),
+      MovingAttempts = get_moving_attempts(NewCarData),
+      FinalCarData = if
+                       MovingAttempts >= ?TOWTRUCK_THRESHOLD ->
+                         dim_env:request_towtruck(NextNode),
+                         reset_moving_attempts(NewCarData);
+                       true -> NewCarData
+                     end,
+      {next_state, inqueue, FinalCarData, [MvTimeOut]};
+    {true, arrived} ->
       dim_env:delete_car(get_name(CarData), NowNode),
       stop;
     {true, tail_node} ->
@@ -276,6 +303,8 @@ inqueue(state_timeout, ?CAR_MV, CarData) ->
       {next_state, discover, NewCarData}
   end;
 
+inqueue({call, From}, ?IS_STALLED, _CarData) ->
+  {keep_state_and_data, [{reply, From, false}]};
 %% Gestisco tutti gli altri messaggi che arrivano quando sono nello stato "inqueue"
 %% Message corrisponde al tipo di evento ricevuto (ho usato macro)
 %% MessageData e' l'eventuale payload del messaggio
@@ -334,6 +363,9 @@ discover(cast, {?BULLY_COORD, Master}, CarData) ->
   %% errore
   NewCarData = CarData#cardata{leader = Master},
   {next_state, slave, NewCarData};
+
+discover({call, From}, ?IS_STALLED, _CarData) ->
+  {keep_state_and_data, [{reply, From, false}]};
 
 discover(info, Msg, CarData) ->
   print(CarData,
@@ -394,6 +426,9 @@ election(cast, {?BULLY_COORD, Master}, CarData) ->
   NewCarData = CarData#cardata{leader = Master},
   {next_state, slave, NewCarData};
 
+election({call, From}, ?IS_STALLED, _CarData) ->
+  {keep_state_and_data, [{reply, From, false}]};
+
 election(info, Msg, CarData) ->
   print(CarData,
         "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p",
@@ -443,8 +478,13 @@ slave(cast, ?RED, CarData) ->
 slave({call, From}, ?BULLY_ELECT, _CarData) ->
   {keep_state_and_data, [{reply, From, ?BULLY_ANS}]};
 
-slave(info, From, CarData) ->
-  From ! CarData,
+slave({call, From}, ?IS_STALLED, _CarData) ->
+  {keep_state_and_data, [{reply, From, false}]};
+
+slave(info, Msg, CarData) ->
+  print(CarData,
+        "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p",
+        [?FUNCTION_NAME, Msg]),
   keep_state_and_data.
 
 master(enter, _OldState, CarData) ->
@@ -530,8 +570,13 @@ master(cast,{?DISC, {FromCar, _Route}}, CarData) ->
   send_wait(FromCar, get_name(CarData), "I'm the LEADER"),
   keep_state_and_data;
 
-master(info, From, CarData) ->
-  From ! CarData,
+master({call, From}, ?IS_STALLED, _CarData) ->
+  {keep_state_and_data, [{reply, From, false}]};
+
+master(info, Msg, CarData) ->
+  print(CarData,
+        "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p",
+        [?FUNCTION_NAME, Msg]),
   keep_state_and_data.
 
 crossing(enter, _OldState, CarData) ->
@@ -558,7 +603,15 @@ crossing(state_timeout, ?CAR_MV, CarData) ->
         [?FUNCTION_NAME, IsFree]),
   case {IsFree, NextNodeType} of
     {false, _} ->
-      {keep_state, CarData, [MvTimeOut]};
+      NewCarData = increment_moving_attempts(CarData),
+      MovingAttempts = get_moving_attempts(NewCarData),
+      FinalCarData = if
+                       MovingAttempts >= ?TOWTRUCK_THRESHOLD ->
+                         dim_env:request_towtruck(NextNode),
+                         reset_moving_attempts(NewCarData);
+                       true -> NewCarData
+                     end,
+      {keep_state, FinalCarData, [MvTimeOut]};
     {true, out_node} ->
       print(CarData, "Moving to next node", []),
       NewCarData = move_to_next_pos(CarData),
@@ -569,7 +622,16 @@ crossing(state_timeout, ?CAR_MV, CarData) ->
       {keep_state, NewCarData, [MvTimeOut]};
     Other ->
       print(CarData, "OOOOOO <<crossing>> ~p", [Other])
-  end.
+  end;
+
+crossing({call, From}, ?IS_STALLED, _CarData) ->
+  {keep_state_and_data, [{reply, From, false}]};
+
+crossing(info, Msg, CarData) ->
+  print(CarData,
+        "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p",
+        [?FUNCTION_NAME, Msg]),
+  keep_state_and_data.
 
 terminate(_Reason, _State, _Data) ->
     ok.

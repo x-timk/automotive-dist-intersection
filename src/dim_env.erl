@@ -2,7 +2,7 @@
 -export([go/0,t/0]).
 
 %% Export Public API genserver
--export([spawn_car/6, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3, delete_car/2]).
+-export([spawn_car/6, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3, delete_car/2, request_towtruck/1]).
 
 %% gen_event export stuff
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
@@ -293,6 +293,9 @@ spawn_car(CarName, CarDesc, StartPos, EndPos, Speed, Prio) ->
 broadcast_disc(FromCar) ->
   gen_server:cast(?MODULE, {disc, FromCar}).
 
+request_towtruck(Node) ->
+  gen_server:cast(?MODULE, {check_fault, Node}).
+
 %% Request proximity sensor data
 req_prox_sensor_data(FromCar, Position) ->
   gen_server:call(?MODULE, {posfree, {FromCar, Position}}).
@@ -305,6 +308,15 @@ notify_move(CarName, CurrentPos, NextPos) ->
 handle_cast({disc, Msg={FromCar, _Route}},W) ->
   Cars = get_car_neighboorhood(W#world.undir, FromCar, ?PROX_RANGE),
   broadcast_discover(Msg, Cars),
+  {noreply, W};
+handle_cast({check_fault, Node}, W = #world{undir = G}) ->
+  {Node, {Type, Cars}} = graph:get_vertex_label(G, Node),
+  NewCars = lists:filter(fun (Car) ->
+                             not vehicle:is_stalled(Car)
+                         end,
+                         Cars),
+  print("~p", [NewCars]),
+  graph:add_vertex(G, Node, {Type, NewCars}),
   {noreply, W}.
 
 
@@ -363,17 +375,17 @@ t() ->
 
   World = create_world(),
   gen_server:start_link({local, ?MODULE}, dim_env, World, []),
-  dim_env:spawn_car(car1, "LanciaDelta", i_nord3, o_sud3, 1000, 1),
+  dim_env:spawn_car(car1, "LanciaDelta", i_nord2, o_sud3, 10000, 1),
   timer:sleep(1500),
 
-  dim_env:spawn_car(car2, "LanciaDelta", i_est3, o_sud3, 1000, 0),
+  dim_env:spawn_car(car2, "LanciaDelta", i_nord3, o_sud3, 1000, 0),
   timer:sleep(1500),
 
-  dim_env:spawn_car(car3, "LanciaDelta", i_sud3, o_nord3, 1000, 2),
-  timer:sleep(1500),
+  %% dim_env:spawn_car(car3, "LanciaDelta", i_sud3, o_nord3, 1000, 2),
+  %% timer:sleep(1500),
 
-  dim_env:spawn_car(car4, "LanciaDelta", i_ovest3, o_sud3, 1000, 0),
-  timer:sleep(1500),
+  %% dim_env:spawn_car(car4, "LanciaDelta", i_ovest3, o_sud3, 1000, 0),
+  %% timer:sleep(1500),
 
 
   ok.
