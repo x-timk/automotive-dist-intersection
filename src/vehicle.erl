@@ -47,7 +47,7 @@
 -define(MASTER_FETCH_TIMEOUT, 5000).
 -define(SLAVE_TIMEOUT, 10000).
 
--define(CROSSING_SPEED, 5000).
+-define(CROSSING_SPEED, 2500).
 
 -define(TOWTRUCK_THRESHOLD, 5).
 %% Messaggio richiesta movimento veicolo
