@@ -10,7 +10,9 @@
 
 -record(world, {
   dir,
-  undir
+  undir,
+  gui_mbox = mbox,
+  gui_node = 'jv@Altro-MB.local'
 }).
 
 %% portata antenna wireless a bordo di ogni auto
@@ -256,7 +258,9 @@ add_car_to_graph(W, Name, Desc, VStart, Vstop, Speed, Prio) ->
   vehicle:start_link({?MODULE, Name, Desc, get_vertex_type_array(W#world.dir, Path), Speed, Prio}).
 
 
-%% Funzione per testare il funzionamento del sistema
+%% Send to java gui
+gui_update_graph(Node, Mbox, G) ->
+  {Mbox, Node} ! {undirgraph, {get_vertex_cars_array(G, graph:vertices(G))}}.
 
 %% gen_event stuff
 init(_Args) ->
@@ -301,6 +305,7 @@ handle_call({move, {CarName, {CurrentPos, NextPos}}}, _From, W) ->
   print("Received move", []),
   %% Stampo posizione auto nel grafo
   print("~p", [get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))]),
+  gui_update_graph(W#world.gui_node, W#world.gui_mbox, W#world.undir),
   {reply, ok, W};
 
 handle_call({delete_car, {CarName, Pos}}, _From, W) ->
@@ -323,6 +328,9 @@ terminate(_Args, _Fd) ->
   ok.
 
 t() ->
+
+  % gui_update_graph('jv@Altro-MB.local', mbox, {}).
+
   World = create_world(),
   gen_server:start_link({local, ?MODULE}, dim_env, World, []),
   dim_env:spawn_car(car1, "LanciaDelta", i_nord3, o_sud3, 1000, 1),
@@ -337,26 +345,7 @@ t() ->
   dim_env:spawn_car(car4, "LanciaDelta", i_ovest3, o_sud3, 1000, 0),
   timer:sleep(500),
 
-  % dim_env:spawn_car(car5, "LanciaDelta", i_nord3, o_est3, 1000),
-  % timer:sleep(500),
 
-  % dim_env:spawn_car(car6, "LanciaDelta", i_ovest3, o_est3, 1000),
-
-
-  % dim_env ! {init, ok},
-  % dim_env ! {spawn_car, {car1, "LanciaDelta", i_nord3, o_est3, 3000}},
-  % timer:sleep(1000),
-
-  % dim_env ! {spawn_car, {car2, "Renault5", i_sud3, o_est3, 3000}},
-  % timer:sleep(1000),
-
-  % dim_env ! {spawn_car, {car3, "Ferrari", i_est3, o_sud3, 3000}},
-  % timer:sleep(1000),
-
-  % dim_env ! {spawn_car, {car4, "Panda", i_ovest3, o_nord3, 3000}},
-  % timer:sleep(2000),
-
-  % dim_env ! {spawn_car, {car5, "Clio", i_nord3, o_sud3, 3000}},
   ok.
 
   % gen_event:add_handler(dim_env, dim_env, []).
