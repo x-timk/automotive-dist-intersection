@@ -8,6 +8,7 @@ import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangPid;
+import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 import com.ericsson.otp.erlang.OtpMbox;
 import com.ericsson.otp.erlang.OtpNode;
@@ -76,7 +77,24 @@ public class ErlMBox extends Thread {
 						}
 						System.out.println("------------------------------------");
 						break;
+					case "carstate":
 						
+						OtpErlangTuple cardataotp = (OtpErlangTuple) payload.elementAt(1);
+						OtpErlangAtom carname = (OtpErlangAtom) cardataotp.elementAt(2);
+						OtpErlangAtom stateotp = (OtpErlangAtom) payload.elementAt(0);
+//						System.out.println("Cardata: " + cardataotp.toString());
+						gui.updatecarstate(carname.toString(), stateotp.toString());
+						break;
+					case "carcolor":
+						String color = ((OtpErlangAtom) payload.elementAt(0)).toString();
+						cardataotp = (OtpErlangTuple) payload.elementAt(1);
+						System.out.println("Cardata: " + cardataotp.toString());
+						OtpErlangList route = (OtpErlangList) cardataotp.elementAt(4);
+						System.out.println(route.toString());
+						OtpErlangTuple mypostuple = (OtpErlangTuple) route.elementAt(0);
+						String mypos = ((OtpErlangAtom) mypostuple.elementAt(0)).toString();
+						gui.updatecarcolor(mypos, color);
+						break;
 					default:
 						System.out.println("Unknown message");
 					}

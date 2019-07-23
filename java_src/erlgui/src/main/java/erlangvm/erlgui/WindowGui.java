@@ -12,7 +12,9 @@ import com.ericsson.otp.erlang.*;
 import java.awt.GridLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.text.DefaultCaret;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -29,7 +31,12 @@ public class WindowGui {
 
 	private JFrame frame;
 	private JFrame frame2;
+	private JFrame frame3;
 
+	private JTextArea textArea = new JTextArea (30,30);
+
+	private Map<String, JFrame> jframemap = new HashMap<String, JFrame>();
+	
 	private static OtpConnection connection;
 	/**
 	 * Launch the application.
@@ -42,6 +49,10 @@ public class WindowGui {
 	private Map<String, Couple> map = new HashMap<String, Couple>();
 	private JLabel[][] labels = new JLabel[squaredim][squaredim];
 
+	private Map<String, JLabel> carinfo = new HashMap<String, JLabel>();
+
+	private int startRand = 0;
+	
 	public static void spawn_car(OtpConnection connection, String car, String desc, String start, String stop, int speed) {
         OtpErlangObject[] funargs = new OtpErlangObject[6];
         funargs[0] = new OtpErlangAtom(car);
@@ -59,8 +70,7 @@ public class WindowGui {
         catch (Exception e) {
         	e.printStackTrace();
         }
-        		
-
+        
 	}
 
 
@@ -75,7 +85,28 @@ public class WindowGui {
 			carsin = carsin + it.next();
 		}
 		labels[x][y].setText(carsin);
+		labels[x][y].setForeground(Color.BLACK);
+
 		
+	}
+	public void updatecarcolor(String node, String color){
+		System.out.println("node " + node);
+		int x = map.get(node).getx();
+		int y = map.get(node).gety();
+		
+		switch(color) {
+		case "green":
+			labels[x][y].setForeground(Color.GREEN);
+			break;
+		case "red":
+			labels[x][y].setForeground(Color.RED);
+		}
+		
+		
+	}
+	
+	public void updatecarstate(String car, String state){
+		textArea.append(">> " + car + " entered in state " + state + "\n");
 	}
 	
 	public static void main(String[] args) {
@@ -168,9 +199,21 @@ public class WindowGui {
 		  public void actionPerformed(ActionEvent e)
 		  {
 			int randomNum = ThreadLocalRandom.current().nextInt(1, 999);
+			String[] starts = {"i_nord3", "i_est3", "i_ovest3", "i_sud3"};
+			String[] stops = {"o_nord3", "o_est3", "o_ovest3", "o_sud3"};
+			startRand = (startRand + 1) % 4;
+			int stopRand = ThreadLocalRandom.current().nextInt(0, 4);
 
+			int speedRand = ThreadLocalRandom.current().nextInt(1000, 3000);
+			
 		    // display/center the jdialog when the button is pressed
-		    spawn_car(connection, "car" + 1, "Fiat Panda", "i_nord3", "o_sud3", 500);
+			String car = "car" + randomNum;
+//			JFrame j = new JFrame(car);
+//			j.setBounds(50,50,150,150);
+//			jframemap.put(car, j);
+//			j.setVisible(true);
+			
+		    spawn_car(connection, car, "Fiat Panda", starts[startRand], stops[stopRand], speedRand);
 //		    JDialog d = new JDialog(frame, "Hello", true);
 //		    d.setLocationRelativeTo(frame);
 //		    d.setVisible(true);
@@ -181,6 +224,24 @@ public class WindowGui {
 	    panel2.add(b);
 	    frame2.setContentPane(panel2);
 	    frame2.setVisible(true);
+
+		frame3 = new JFrame();
+		frame3.setBounds(1050, 0, 400, 600);
+		frame3.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		JPanel panel3 = new JPanel();
+		frame3.setContentPane(panel3);
+		
+
+		JScrollPane scroll = new JScrollPane (textArea, 
+		   JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
+		
+		DefaultCaret caret = (DefaultCaret) textArea.getCaret();
+		caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+		
+		frame3.add(scroll);
+		
+		frame3.setVisible(true);
+
 		
 		for (int i =0; i<(squaredim); i++){
 			for (int j =0; j<(squaredim); j++){
