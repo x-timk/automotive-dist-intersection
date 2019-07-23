@@ -17,6 +17,7 @@
 
 %% portata antenna wireless a bordo di ogni auto
 -define(PROX_RANGE, 7).
+-define(GENSERVER_CALL_TIMEOUT, 10000).
 
 -behaviour(gen_server).
 
@@ -289,11 +290,15 @@ init(_Args) ->
   {ok,World}.
 
 delete_car(CarName, Pos) -> 
-  gen_server:call(?MODULE, {delete_car, {CarName, Pos}}).
+  gen_server:call(?MODULE, {delete_car, {CarName, Pos}}, ?GENSERVER_CALL_TIMEOUT).
 
 spawn_car(CarName, CarDesc, StartPos, EndPos, Speed, Prio) ->
-  gen_server:call(?MODULE, {spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed, Prio}}).
-
+  try
+    gen_server:call(?MODULE, {spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed, Prio}}, ?GENSERVER_CALL_TIMEOUT)
+  catch
+    exit:{timeout,_} -> {error, timeout};
+    _:_ -> {error, timeout}
+  end.
 broadcast_disc(FromCar) ->
   gen_server:cast(?MODULE, {disc, FromCar}).
 
@@ -302,10 +307,15 @@ request_towtruck(Node) ->
 
 %% Request proximity sensor data
 req_prox_sensor_data(FromCar, Position) ->
-  gen_server:call(?MODULE, {posfree, {FromCar, Position}}).
+  try
+    gen_server:call(?MODULE, {posfree, {FromCar, Position}}, ?GENSERVER_CALL_TIMEOUT)
+  catch
+    exit:{timeout,_} -> false;
+    _:_ -> false
+  end.
 
 notify_move(CarName, CurrentPos, NextPos) ->
-  gen_server:call(?MODULE, {move, {CarName, {CurrentPos, NextPos}}}).
+  gen_server:call(?MODULE, {move, {CarName, {CurrentPos, NextPos}}}, ?GENSERVER_CALL_TIMEOUT).
 
 
 
@@ -374,9 +384,9 @@ go() ->
   gen_server:start_link({local, ?MODULE}, dim_env, World, []).
 
 t() ->
-
   World = create_world(),
   gen_server:start_link({local, ?MODULE}, dim_env, World, []),
+  
   dim_env:spawn_car(car1, "LanciaDelta", i_nord2, o_sud3, 1000, 1),
   timer:sleep(1500),
 
@@ -388,7 +398,6 @@ t() ->
 
   dim_env:spawn_car(car4, "LanciaDelta", i_ovest3, o_sud3, 1000, 0),
   timer:sleep(1500),
-
 
   ok.
 

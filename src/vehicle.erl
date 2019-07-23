@@ -49,7 +49,7 @@
 
 -define(CROSSING_SPEED, 2500).
 
--define(TOWTRUCK_THRESHOLD, 5).
+-define(TOWTRUCK_THRESHOLD, 30).
 %% Messaggio richiesta movimento veicolo
 
 -export([start_link/1]).
@@ -69,7 +69,9 @@
     leader,
     priority,
     conflictGraph = [],
-    failedMovingAttempts = 0
+    failedMovingAttempts = 0,
+    gui_mbox = mbox,
+    gui_node = 'jv@Altro-MB.local'
     }).
 
 
@@ -252,8 +254,15 @@ mis([H | Conflicts], GreenList) ->
   NewConflicts = lists:foldl(F, Conflicts, CarConflicts),
   mis(NewConflicts, NewGreenList).
 
+jgui_update_car_state(State, CarData) ->
+  {CarData#cardata.gui_mbox, CarData#cardata.gui_node} ! {carstate, {State, CarData}}.
+
+jgui_update_car_color(Color, CarData) ->
+  {CarData#cardata.gui_mbox, CarData#cardata.gui_node} ! {carcolor, {Color, CarData}}.
+
 
 inqueue(enter, _OldState, CarData) ->
+  jgui_update_car_state(?FUNCTION_NAME, CarData),
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
   {keep_state, CarData, [{state_timeout, get_speed(CarData), ?CAR_MV}]};
 
@@ -287,6 +296,7 @@ inqueue(state_timeout, ?CAR_MV, CarData) ->
       MovingAttempts = get_moving_attempts(NewCarData),
       FinalCarData = if
                        MovingAttempts >= ?TOWTRUCK_THRESHOLD ->
+                         print(CarData, "<<~s>>:: Moving attemps are ~p", [?FUNCTION_NAME, MovingAttempts]),
                          dim_env:request_towtruck(NextNode),
                          reset_moving_attempts(NewCarData);
                        true -> NewCarData
@@ -319,6 +329,7 @@ inqueue(info, Msg, CarData) ->
 
 
 discover(enter, _OldState, CarData) ->
+  jgui_update_car_state(?FUNCTION_NAME, CarData),
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
   NewCarData = reset_election_data(CarData),
   dim_env:broadcast_disc({get_name(NewCarData), get_route(NewCarData)}),
@@ -378,7 +389,8 @@ discover(A, B, C) ->
   print(C, "EventType: ~p Content: ~p", [A, B]).
 
 
-wait(enter, _OldState, CarData) ->  
+wait(enter, _OldState, CarData) -> 
+  jgui_update_car_state(?FUNCTION_NAME, CarData),
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
   {keep_state, CarData, [{state_timeout, ?STATE_WAIT_TIMEOUT, ?WAIT_TM}]};
 
@@ -393,6 +405,7 @@ wait(_, _, CarData) ->
 
 
 election(enter, _OldState, CarData) ->
+  jgui_update_car_state(?FUNCTION_NAME, CarData),
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
   Me = get_name(CarData),
   Others = lists:map(fun({C,_}) -> C end, get_neighbours(CarData)),
@@ -452,6 +465,7 @@ election(info, Msg, CarData) ->
   {next_state, election, CarData}.
 
 slave(enter, _OldState, CarData) ->
+  jgui_update_car_state(?FUNCTION_NAME, CarData),
   print(CarData, "Slave waiting the master", []),
   %% Trasformo lista in set
   MyRoute = sets:from_list(get_route(CarData)),
@@ -483,10 +497,12 @@ slave(cast,{?DISC, {FromCar, _Route}}, CarData) ->
 
 
 slave(cast, ?GREEN, CarData) ->
+  jgui_update_car_color(?GREEN, CarData),
   print(CarData, "<<~s>>:: Received Msg ~p", [?FUNCTION_NAME, ?GREEN]),
   {next_state, crossing, CarData};
 
 slave(cast, ?RED, CarData) ->
+  jgui_update_car_color(?RED, CarData),
   print(CarData, "<<~s>>:: Received Msg ~p", [?FUNCTION_NAME, ?RED]),
   NewCarData = increment_priority(CarData),
   {next_state, discover, NewCarData};
@@ -504,6 +520,7 @@ slave(info, Msg, CarData) ->
   keep_state_and_data.
 
 master(enter, _OldState, CarData) ->
+  jgui_update_car_state(?FUNCTION_NAME, CarData),
   print(CarData, "Master ready to coordinate", []),
   lists:map(fun({Car,_}) -> send_bully_coord(Car, get_name(CarData)) end, CarData#cardata.neighbourPids),
   MyRoute = sets:from_list(get_route(CarData)),
@@ -569,10 +586,13 @@ master(cast, {?CONFLICT, Data}, CarData) ->
   {keep_state, NewCarData};
 
 master(cast, ?GREEN, CarData) ->
+
+  jgui_update_car_color(?GREEN, CarData),
   print(CarData, "<<~s>>:: Received Msg ~p", [?FUNCTION_NAME, ?GREEN]),
   {next_state, crossing, CarData};
 
 master(cast, ?RED, CarData) ->
+  jgui_update_car_color(?RED, CarData),
   print(CarData, "<<~s>>:: Received Msg ~p", [?FUNCTION_NAME, ?RED]),
   NewCarData = increment_priority(CarData),
   {next_state, discover, NewCarData};
@@ -596,6 +616,7 @@ master(info, Msg, CarData) ->
   keep_state_and_data.
 
 crossing(enter, _OldState, CarData) ->
+  jgui_update_car_state(?FUNCTION_NAME, CarData),
   print(CarData, "<<~s>>:: I Can go", [?FUNCTION_NAME]),
   NewCarData = reset_election_data(CarData),
   {keep_state, NewCarData, [{state_timeout, ?CROSSING_SPEED, ?CAR_MV}]};
