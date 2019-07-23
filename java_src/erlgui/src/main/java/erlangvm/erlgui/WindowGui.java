@@ -170,7 +170,7 @@ public class WindowGui {
 			int randomNum = ThreadLocalRandom.current().nextInt(1, 999);
 
 		    // display/center the jdialog when the button is pressed
-		    spawn_car(connection, "car" + randomNum, "Fiat Panda", "i_nord3", "o_sud3", 5000);
+		    spawn_car(connection, "car" + 1, "Fiat Panda", "i_nord3", "o_sud3", 500);
 //		    JDialog d = new JDialog(frame, "Hello", true);
 //		    d.setLocationRelativeTo(frame);
 //		    d.setVisible(true);
