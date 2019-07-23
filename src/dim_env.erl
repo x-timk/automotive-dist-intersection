@@ -281,6 +281,7 @@ jgui_update_graph(Node, Mbox, G) ->
 
 %% gen_event stuff
 init(_Args) ->
+  process_flag(trap_exit, true),
   World = create_world(),
   {ok,World}.
 
@@ -371,21 +372,19 @@ go() ->
 
 t() ->
 
-  % gui_update_graph('jv@Altro-MB.local', mbox, {}).
-
   World = create_world(),
   gen_server:start_link({local, ?MODULE}, dim_env, World, []),
-  dim_env:spawn_car(car1, "LanciaDelta", i_nord2, o_sud3, 10000, 1),
+  dim_env:spawn_car(car1, "LanciaDelta", i_nord2, o_sud3, 1000, 1),
   timer:sleep(1500),
 
-  dim_env:spawn_car(car2, "LanciaDelta", i_nord3, o_sud3, 1000, 0),
+  dim_env:spawn_car(car2, "LanciaDelta", i_est3, o_sud3, 1000, 0),
   timer:sleep(1500),
 
-  %% dim_env:spawn_car(car3, "LanciaDelta", i_sud3, o_nord3, 1000, 2),
-  %% timer:sleep(1500),
+  dim_env:spawn_car(car3, "LanciaDelta", i_sud3, o_nord3, 1000, 2),
+  timer:sleep(1500),
 
-  %% dim_env:spawn_car(car4, "LanciaDelta", i_ovest3, o_sud3, 1000, 0),
-  %% timer:sleep(1500),
+  dim_env:spawn_car(car4, "LanciaDelta", i_ovest3, o_sud3, 1000, 0),
+  timer:sleep(1500),
 
 
   ok.
