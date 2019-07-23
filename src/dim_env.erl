@@ -271,8 +271,11 @@ get_vertex_cars_array(G, [H|T]) ->
 %% Speed: velocita' movimento (es: con un valore 2000 l'auto tenta di muoversi ogni 2 secondi)
 add_car_to_graph(W, Name, Desc, VStart, Vstop, Speed, Prio) ->
   Path = get_min_path(W#world.dir, VStart, Vstop),
-  add_car_to_vertex(W#world.undir, VStart, Name),
-  vehicle:start_link({?MODULE, Name, Desc, get_vertex_type_array(W#world.dir, Path), Speed, Prio}).
+  {Res, _Ot} = vehicle:start_link({?MODULE, Name, Desc, get_vertex_type_array(W#world.dir, Path), Speed, Prio}),
+  case Res of
+    ok -> add_car_to_vertex(W#world.undir, VStart, Name);
+    _Other -> ko
+  end.
 
 
 %% Send to java gui
