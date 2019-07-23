@@ -21,7 +21,7 @@
 -define(ELECT_TM, elect_tm).
 -define(MFETCH_TM, mfetch_tm).
 -define(SLAVE_TM, slave_tm).
-
+-define(WAIT_TM, wait_tm).
 %% Evento scatenato quando la auto vuole muoversi alla prossima posizione
 -define(CAR_MV, car_mv).
 
@@ -40,6 +40,7 @@
 -define(POSFREE_RESP,posfree_resp).
 
 %% Valori Timeout di stati
+-define(STATE_WAIT_TIMEOUT, 2000).
 -define(STATE_DISCOVER_TIMEOUT, 5000).
 -define(STATE_ELECTION_TIMEOUT, 5000).
 -define(BULLY_ANSWER_TIMEOUT, 1000).
@@ -53,7 +54,7 @@
 
 -export([start_link/1]).
 -export([init/1, callback_mode/0, terminate/3]).
--export([inqueue/3, discover/3, election/3, slave/3, master/3, crossing/3]).
+-export([inqueue/3, discover/3, election/3, slave/3, master/3, crossing/3, wait/3]).
 %% -export([print/3]).
 
 %% tupla contenente tutte le info che l'auto si porta dietro tra i vari stati
@@ -228,7 +229,8 @@ is_stalled(Car) ->
   try
     gen_statem:call(Car, ?IS_STALLED)
   catch
-    exit:{timeout,_} -> true
+    exit:{timeout,_} -> true;
+    _:_ -> true
   end.
 
 % Conflicts [ {car3,2,[car4,car1,car2]}, {car1,1,[car4,car3,car2]}, {car4,0,[car3,car1,car2]}, {car2,0,[car4,car3,car1]}]
@@ -352,8 +354,8 @@ discover(cast, {?WAIT, {_FromCar, _Reason}}, CarData) ->
   print(CarData, "<<~s>>:: Received Event ~p", [?FUNCTION_NAME, ?WAIT]),
   print(CarData, "Remaining in state <<~s>> and resetting timeout",
         [?FUNCTION_NAME]),
-  timer:sleep(2000),
-  repeat_state_and_data;
+  % timer:sleep(2000),
+  {next_state, wait, CarData};
 
 discover({call, From}, ?BULLY_ELECT, CarData) ->
   {next_state, election, CarData, [{reply, From, ?BULLY_ANS}]};
@@ -374,6 +376,20 @@ discover(info, Msg, CarData) ->
   {next_state, discover, CarData};
 discover(A, B, C) ->
   print(C, "EventType: ~p Content: ~p", [A, B]).
+
+
+wait(enter, _OldState, CarData) ->  
+  print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
+  {keep_state, CarData, [{state_timeout, ?STATE_WAIT_TIMEOUT, ?WAIT_TM}]};
+
+
+wait(state_timeout, ?WAIT_TM, CarData) ->
+  print(CarData, "<<~s>>:: Received event ~p", [?FUNCTION_NAME, ?DISC_TM]),
+  {next_state, discover, CarData};
+
+wait(_, _, CarData) ->  
+  print(CarData, "Ignoring all msg in <<~s>> state", [?FUNCTION_NAME]),
+  keep_state_and_data.
 
 
 election(enter, _OldState, CarData) ->
