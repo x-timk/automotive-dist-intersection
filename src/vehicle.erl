@@ -22,6 +22,7 @@
 -define(MFETCH_TM, mfetch_tm).
 -define(SLAVE_TM, slave_tm).
 -define(WAIT_TM, wait_tm).
+-define(FAULT_TM, fault_tm).
 %% Evento scatenato quando la auto vuole muoversi alla prossima posizione
 -define(CAR_MV, car_mv).
 
@@ -54,7 +55,7 @@
 
 -export([start_link/1]).
 -export([init/1, callback_mode/0, terminate/3]).
--export([inqueue/3, discover/3, election/3, slave/3, master/3, crossing/3, wait/3]).
+-export([inqueue/3, discover/3, election/3, slave/3, master/3, crossing/3, wait/3, ph_fault/3]).
 %% -export([print/3]).
 
 %% tupla contenente tutte le info che l'auto si porta dietro tra i vari stati
@@ -70,6 +71,7 @@
     priority,
     conflictGraph = [],
     failedMovingAttempts = 0,
+    faultProb,
     gui_mbox = mbox,
     gui_node = 'jv@Altro-MB.local'
     }).
@@ -94,8 +96,8 @@ callback_mode() ->
 %% 4) Lista di eventuali opzioni avanzate per la state machine
 %% L'idea è che quando faccio spawn di una macchina la lancio con i parametri {Env, Name, Desc, Route, Speed}
 start_link(Data) ->
-  {Env, Name, Desc, Route, Speed, Prio} = Data,
-  CarData = #cardata{env = Env, name = Name, desc = Desc, route = Route, neighbourPids = [], speed = Speed, priority = Prio},
+  {Env, Name, Desc, Route, Speed, Prio, FaultProb} = Data,
+  CarData = #cardata{env = Env, name = Name, desc = Desc, route = Route, neighbourPids = [], speed = Speed, priority = Prio, faultProb = FaultProb},
   gen_statem:start_link({local,CarData#cardata.name}, ?MODULE, CarData, []).
 
 
@@ -105,7 +107,23 @@ start_link(Data) ->
 init(CarData) ->
   print(CarData, "<<~s>> Car SPAWNED!", [?FUNCTION_NAME]),
   print(CarData, "<<~s>> Car Data is ~p", [?FUNCTION_NAME, CarData]),
-  {ok, inqueue, CarData}.
+  Rand = rand:uniform(),
+  Timeout = if
+    Rand < CarData#cardata.faultProb -> 
+      (rand:uniform(13) + 2) * 1000;
+    true ->
+      infinity
+    end,
+
+  Rand2 = rand:uniform(),
+  FaultType = if
+    Rand2 < 0.5 ->
+      logical_fault;
+    true ->
+      physical_fault
+  end,
+
+  {ok, inqueue, CarData, [{{timeout, FaultType}, Timeout, ?FAULT_TM}] }.
 
 
 get_neighbours(CarData) ->
@@ -215,7 +233,8 @@ send_bully_elect(Car) ->
   try
     gen_statem:call(Car, ?BULLY_ELECT, ?BULLY_ANSWER_TIMEOUT)
   catch
-    exit:{timeout,_} -> ?BULLY_NO_ANS
+    exit:{timeout,_} -> ?BULLY_NO_ANS;
+    _:_ -> ?BULLY_NO_ANS
   end.
 
 send_bully_coord(Car, Master) ->
@@ -265,6 +284,15 @@ inqueue(enter, _OldState, CarData) ->
   jgui_update_car_state(?FUNCTION_NAME, CarData),
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
   {keep_state, CarData, [{state_timeout, get_speed(CarData), ?CAR_MV}]};
+
+inqueue({timeout, logical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Logical Fault", [?FUNCTION_NAME]),
+  exit(ogical_fault);
+
+inqueue({timeout, physical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Physical Fault", [?FUNCTION_NAME]),
+  {next_state, ph_fault, CarData};
+
 
 inqueue(cast, {?DISC, _FromCar}, CarData) ->
   print(CarData,
@@ -335,6 +363,13 @@ discover(enter, _OldState, CarData) ->
   dim_env:broadcast_disc({get_name(NewCarData), get_route(NewCarData)}),
   {keep_state,NewCarData, [{state_timeout, ?STATE_DISCOVER_TIMEOUT, ?DISC_TM}]};
 
+discover({timeout, logical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Logical Fault", [?FUNCTION_NAME]),
+  exit(self(), logical_fault);
+
+discover({timeout, physical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Physical Fault", [?FUNCTION_NAME]),
+  {next_state, ph_fault, CarData};
 
 discover(cast, {?DISC, Msg={FromCar, _Route}}, CarData) ->
   print(CarData, "<<~s>>:: Received Event ~p", [?FUNCTION_NAME, ?DISC]),
@@ -394,6 +429,13 @@ wait(enter, _OldState, CarData) ->
   print(CarData, "Entered in <<~s>> state", [?FUNCTION_NAME]),
   {keep_state, CarData, [{state_timeout, ?STATE_WAIT_TIMEOUT, ?WAIT_TM}]};
 
+wait({timeout, logical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Logical Fault", [?FUNCTION_NAME]),
+  exit(self(), logical_fault);
+
+wait({timeout, physical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Physical Fault", [?FUNCTION_NAME]),
+  {next_state, ph_fault, CarData};
 
 wait(state_timeout, ?WAIT_TM, CarData) ->
   print(CarData, "<<~s>>:: Received event ~p", [?FUNCTION_NAME, ?DISC_TM]),
@@ -428,6 +470,14 @@ election(enter, _OldState, CarData) ->
   {keep_state,
    CarData#cardata{isLeader=IsLeader},
    [{state_timeout, ElectionTimeOut, ?ELECT_TM}]};
+
+election({timeout, logical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Logical Fault", [?FUNCTION_NAME]),
+  exit(self(), logical_fault);
+
+election({timeout, physical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Physical Fault", [?FUNCTION_NAME]),
+  {next_state, ph_fault, CarData};
 
 election(state_timeout, ?ELECT_TM, CarData = #cardata{isLeader=true}) ->
   {next_state, master, CarData};
@@ -485,6 +535,14 @@ slave(enter, _OldState, CarData) ->
 
   send_conflict(get_master(CarData), ConflictsMessage),
   {keep_state, CarData, [{state_timeout, ?SLAVE_TIMEOUT, ?SLAVE_TM}]};
+
+slave({timeout, logical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Logical Fault", [?FUNCTION_NAME]),
+  exit(self(), logical_fault);
+
+slave({timeout, physical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Physical Fault", [?FUNCTION_NAME]),
+  {next_state, ph_fault, CarData};
 
 slave(state_timeout, ?SLAVE_TM, CarData) ->
   print(CarData, "<<~s>>:: Master did not send any instruction.", [?FUNCTION_NAME]),
@@ -550,6 +608,14 @@ master(enter, _OldState, CarData) ->
   %% Gli slave me la manderanno tramite api
   NewCarData = add_conflict(CarData, ConflictsMessage),
   {keep_state, NewCarData, [{state_timeout, ?MASTER_FETCH_TIMEOUT, ?MFETCH_TM}]};
+
+master({timeout, logical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Logical Fault", [?FUNCTION_NAME]),
+  exit(self(), logical_fault);
+
+master({timeout, physical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Physical Fault", [?FUNCTION_NAME]),
+  {next_state, ph_fault, CarData};
 
 master(state_timeout, ?MFETCH_TM, CarData) ->
   print(CarData, "<<~s>>:: Overall Conflicts: ~p", [?FUNCTION_NAME, get_conflicts(CarData)]),
@@ -621,6 +687,13 @@ crossing(enter, _OldState, CarData) ->
   NewCarData = reset_election_data(CarData),
   {keep_state, NewCarData, [{state_timeout, ?CROSSING_SPEED, ?CAR_MV}]};
 
+crossing({timeout, logical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Logical Fault", [?FUNCTION_NAME]),
+  exit(self(), logical_fault);
+
+crossing({timeout, physical_fault}, ?FAULT_TM, CarData) ->
+  print(CarData, "<<~s>>: Physical Fault", [?FUNCTION_NAME]),
+  {next_state, ph_fault, CarData};
 
 crossing(cast,{?DISC, {FromCar, _Route}}, CarData) ->
   send_wait(FromCar, get_name(CarData), "I'm the LEADER"),
@@ -669,6 +742,22 @@ crossing(info, Msg, CarData) ->
         "<<~s>>:: Received INFO UNKNOWN EVENT. Ignoring this message: ~p",
         [?FUNCTION_NAME, Msg]),
   keep_state_and_data.
+
+ph_fault(enter, _OldState, CarData) ->
+  jgui_update_car_state(?FUNCTION_NAME, CarData),
+  jgui_update_car_color(pink, CarData),
+  print(CarData, "Entered in ph_fault", []),
+  % {Node,_} = current_pos(CarData),
+  % dim_env:request_towtruck(Node),
+  keep_state_and_data;
+
+ph_fault({call, From}, ?IS_STALLED, _CarData) ->
+  {stop_and_reply, physical_fault, [{reply, From, true}]};
+
+ph_fault(_, _, CarData) ->  
+  print(CarData, "Ignoring all msg in <<~s>> state", [?FUNCTION_NAME]),
+  keep_state_and_data.
+
 
 terminate(_Reason, _State, _Data) ->
     ok.

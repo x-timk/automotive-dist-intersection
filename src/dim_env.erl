@@ -2,7 +2,7 @@
 -export([go/0,t/0]).
 
 %% Export Public API genserver
--export([spawn_car/6, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3, delete_car/2, request_towtruck/1]).
+-export([spawn_car/7, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3, delete_car/2, request_towtruck/1]).
 
 %% gen_event export stuff
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
@@ -273,9 +273,9 @@ get_vertex_cars_array(G, [H|T]) ->
 %% VStart: posizione iniziale auto
 %% VStop: posizione finale
 %% Speed: velocita' movimento (es: con un valore 2000 l'auto tenta di muoversi ogni 2 secondi)
-add_car_to_graph(W, Name, Desc, VStart, Vstop, Speed, Prio) ->
+add_car_to_graph(W, Name, Desc, VStart, Vstop, Speed, Prio, FaultProb) ->
   Path = get_min_path(W#world.dir, VStart, Vstop),
-  {Res, _Ot} = vehicle:start_link({?MODULE, Name, Desc, get_vertex_type_array(W#world.dir, Path), Speed, Prio}),
+  {Res, _Ot} = vehicle:start_link({?MODULE, Name, Desc, get_vertex_type_array(W#world.dir, Path), Speed, Prio, FaultProb}),
   case Res of
     ok -> add_car_to_vertex(W#world.undir, VStart, Name);
     _Other -> ko
@@ -302,9 +302,9 @@ init(_Args) ->
 delete_car(CarName, Pos) ->
   gen_server:cast(?MODULE, {delete_car, {CarName, Pos}}).
 
-spawn_car(CarName, CarDesc, StartPos, EndPos, Speed, Prio) ->
+spawn_car(CarName, CarDesc, StartPos, EndPos, Speed, Prio, FaultProb) ->
   try
-    gen_server:call(?MODULE, {spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed, Prio}}, ?GENSERVER_CALL_TIMEOUT)
+    gen_server:call(?MODULE, {spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed, Prio, FaultProb}}, ?GENSERVER_CALL_TIMEOUT)
   catch
     exit:{timeout,_} -> {error, timeout};
     _:_ -> {error, timeout}
@@ -363,16 +363,17 @@ handle_call({move, {CarName, {CurrentPos, NextPos}}}, _From, W) ->
   jgui_update_graph(W#world.gui_node, W#world.gui_mbox, W#world.undir),
   {reply, ok, W};
 
-handle_call({spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed, Prio}}, _From, W) ->
+handle_call({spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed, Prio, FaultProb}}, _From, W) ->
   print("SPAWN REQUEST",[]),
   Occupied = is_node_occupied(W#world.undir, StartPos),
   case Occupied of
     false ->
-      add_car_to_graph(W, CarName, CarDesc, StartPos, EndPos, Speed, Prio),
+      add_car_to_graph(W, CarName, CarDesc, StartPos, EndPos, Speed, Prio, FaultProb),
       print("~p", [get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))]),
       jgui_update_graph(W#world.gui_node, W#world.gui_mbox, W#world.undir),
       {reply, CarName, W};
     true ->
+      request_towtruck(StartPos),
       {reply, "Already occupied", W}
     end.
 
