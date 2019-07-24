@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.EventQueue;
 
 import javax.swing.BorderFactory;
+import javax.swing.DefaultBoundedRangeModel;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 
@@ -13,8 +14,12 @@ import java.awt.GridLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSeparator;
+import javax.swing.JSlider;
 import javax.swing.JTextArea;
 import javax.swing.SwingConstants;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 import javax.swing.text.DefaultCaret;
 
 import java.awt.event.ActionEvent;
@@ -22,6 +27,7 @@ import java.awt.event.ActionListener;
 
 
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +61,10 @@ public class WindowGui {
 	private int startRand = 0;
 	
 	private static AutoCarSpawner autospawner;
+	
+	private JSlider slider;
+	
+	private double faultprob = 0;
 	
 	public void spawn_car(OtpConnection connection, String car, String desc, String start, String stop, int speed, int prio, double faultprob) {
         OtpErlangObject[] funargs = new OtpErlangObject[7];
@@ -204,10 +214,10 @@ public class WindowGui {
 		panel.setBorder(BorderFactory.createEmptyBorder(4,4,4,4));
 		
 		frame2 = new JFrame();
-		frame2.setBounds(850, 0, 200, 200);
+		frame2.setBounds(850, 0, 200, 700);
 		frame2.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-		JPanel panel2 = new JPanel();
+		JPanel panel2 = new JPanel(new GridLayout(10,1));
 		JButton b = new JButton("Spawn Car");
 		b.addActionListener(new ActionListener()
 		{
@@ -220,21 +230,20 @@ public class WindowGui {
 			int stopRand = ThreadLocalRandom.current().nextInt(0, 4);
 			int speedRand = ThreadLocalRandom.current().nextInt(200, 1000);
 			String car = "car" + randomNum;			
-		    spawn_car(connection, car, "Fiat Panda", starts[startRand], stops[stopRand], speedRand, 0, 0.8);
+		    spawn_car(connection, car, "Fiat Panda", starts[startRand], stops[stopRand], speedRand, 0, faultprob);
 		  }
 		});
 
 	    b.setBounds(200,200,95,30);
 	    panel2.add(b);
 
+        JSeparator s1 = new JSeparator(); 
+        s1.setOrientation(SwingConstants.HORIZONTAL);
+        panel2.add(s1);
+
+	    
 		JButton b2 = new JButton("AutoSpawn Start");
-		b2.addActionListener(new ActionListener()
-		{
-		  public void actionPerformed(ActionEvent e)
-		  {
-			  autospawner.begin();
-		  }
-		});
+
 	    b2.setBounds(200,200,95,30);
 	    panel2.add(b2);
 
@@ -244,11 +253,53 @@ public class WindowGui {
 		  public void actionPerformed(ActionEvent e)
 		  {
 			  autospawner.gracefulstop();
+			  b3.setEnabled(false);
+			  b2.setEnabled(true);
+
+		  }
+		});
+		b2.addActionListener(new ActionListener()
+		{
+		  public void actionPerformed(ActionEvent e)
+		  {
+			  autospawner.begin();
+			  b2.setEnabled(false);
+			  b3.setEnabled(true);
 		  }
 		});
 	    b3.setBounds(200,200,95,30);
 	    panel2.add(b3);
-	    
+
+	   
+		DefaultBoundedRangeModel model = new DefaultBoundedRangeModel(0, 0, 0, 100);
+		slider = new JSlider(model);
+        Hashtable<Integer, JLabel> position = new Hashtable<Integer, JLabel>();
+        position.put(0, new JLabel("0%"));
+        position.put(50, new JLabel("50%"));
+        position.put(100, new JLabel("100%"));
+		slider.setLabelTable(position);
+        slider.setMinorTickSpacing(10);
+        slider.setPaintTicks(true);
+
+        JLabel status = new JLabel("Fault Probability: 0%", JLabel.CENTER);
+        panel2.add(status);
+        // Set the labels to be painted on the slider
+        slider.setPaintLabels(true);
+        slider.addChangeListener(new ChangeListener() {
+            public void stateChanged(ChangeEvent e) {
+                status.setText("Fault Probability: " + ((JSlider)e.getSource()).getValue() + "%" );
+                double n = ((JSlider)e.getSource()).getValue();
+                faultprob = ((JSlider)e.getSource()).getValue();
+                autospawner.changeFaultProb(n);
+            }
+        });
+        
+		panel2.add(slider);
+
+        JSeparator s2 = new JSeparator(); 
+        s2.setOrientation(SwingConstants.HORIZONTAL);
+        panel2.add(s2);
+        
 		JButton b4 = new JButton("Spawn Miculan");
 		b4.addActionListener(new ActionListener()
 		{
@@ -265,11 +316,12 @@ public class WindowGui {
 	    b4.setBounds(200,200,95,30);
 	    panel2.add(b4);
 	    
+	    
 	    frame2.setContentPane(panel2);
 	    frame2.setVisible(true);
 
 		frame3 = new JFrame();
-		frame3.setBounds(1050, 0, 400, 600);
+		frame3.setBounds(1050, 0, 400, 700);
 		frame3.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		JPanel panel3 = new JPanel();
 		frame3.setContentPane(panel3);
@@ -283,6 +335,8 @@ public class WindowGui {
 		
 		frame3.add(scroll);
 		
+
+
 		frame3.setVisible(true);
 
 		

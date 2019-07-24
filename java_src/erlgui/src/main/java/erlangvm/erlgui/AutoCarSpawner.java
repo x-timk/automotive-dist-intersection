@@ -10,6 +10,8 @@ public class AutoCarSpawner extends Thread{
 	private OtpConnection connection;
 	private boolean running;
 	
+	private double faultprob = 0;
+	
 	public AutoCarSpawner(WindowGui gui, OtpConnection connection){
 		this.gui = gui;
 		this.connection = connection;
@@ -22,6 +24,10 @@ public class AutoCarSpawner extends Thread{
 
 	public void begin(){
 		running = true;
+	}
+	
+	public void changeFaultProb(double n){
+		faultprob = n;
 	}
 	
 	public void run(){
@@ -43,7 +49,7 @@ public class AutoCarSpawner extends Thread{
 	//			jframemap.put(car, j);
 	//			j.setVisible(true);
 				
-			    gui.spawn_car(connection, car, "Fiat Panda", starts[startRand], stops[stopRand], speedRand, 0, 0);
+			    gui.spawn_car(connection, car, "Fiat Panda", starts[startRand], stops[stopRand], speedRand, 0, faultprob);
 	//		    JDialog d = new JDialog(frame, "Hello", true);
 	//		    d.setLocationRelativeTo(frame);
 	//		    d.setVisible(true);
