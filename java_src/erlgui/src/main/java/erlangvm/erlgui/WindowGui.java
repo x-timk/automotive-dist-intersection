@@ -107,8 +107,10 @@ public class WindowGui {
 			break;
 		case "red":
 			labels[x][y].setForeground(Color.RED);
+			break;
 		case "pink":
 			labels[x][y].setForeground(Color.PINK);
+			break;
 		}
 		
 		
@@ -218,7 +220,7 @@ public class WindowGui {
 			int stopRand = ThreadLocalRandom.current().nextInt(0, 4);
 			int speedRand = ThreadLocalRandom.current().nextInt(200, 1000);
 			String car = "car" + randomNum;			
-		    spawn_car(connection, car, "Fiat Panda", starts[startRand], stops[stopRand], speedRand, 0, 0.5);
+		    spawn_car(connection, car, "Fiat Panda", starts[startRand], stops[stopRand], speedRand, 0, 0.8);
 		  }
 		});
 

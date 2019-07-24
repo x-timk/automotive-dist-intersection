@@ -43,7 +43,7 @@ public class AutoCarSpawner extends Thread{
 	//			jframemap.put(car, j);
 	//			j.setVisible(true);
 				
-			    gui.spawn_car(connection, car, "Fiat Panda", starts[startRand], stops[stopRand], speedRand, 0, 0.5);
+			    gui.spawn_car(connection, car, "Fiat Panda", starts[startRand], stops[stopRand], speedRand, 0, 0);
 	//		    JDialog d = new JDialog(frame, "Hello", true);
 	//		    d.setLocationRelativeTo(frame);
 	//		    d.setVisible(true);
