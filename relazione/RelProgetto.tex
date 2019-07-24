@@ -1,0 +1,304 @@
+\documentclass{memoir}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[italian,english]{babel}
+\usepackage{tikz}
+\usetikzlibrary{automata,positioning,topaths}
+
+\title{Implementazione di un sistema di incrocio stradale intelligente \\ for the Project of Distributed Systems}
+
+\author{Tiziano Mele\\Valentino Picotti\\DMIF, University of Udine, Italy}
+
+\date{Version 1, \today}
+
+\begin{document}
+
+
+%\begin{titlingpage}
+\maketitle
+\begin{abstract}
+  Lo scopo del presente documento è quello di descrivere una possibile soluzione
+  distribuita per il problema degli incroci stradali intelligenti.
+\end{abstract}
+%\end{titlingpage}
+
+\chapter{Introduction}\label{ch:intro}
+
+\paragraph{Descrizione dell'applicazione}
+
+
+Un sistema di incrocio stradale intelligente vuole essere una soluzione al
+problema della congestione stradale. Con l'avvento dei sistemi wireless ci si
+chiede se sia possibile per i veicoli stradali di poter decidere direttamente
+tra di loro chi debba impegnare l'incrocio, eliminando quindi i semafori. La
+soluzione proposta per il problema vuole soddisfare i seguenti requisiti:
+\begin{itemize}
+\item Sicurezza stradale: Le auto che attraversano l'incrocio non devono scontrarsi
+\item Fairness: Ogni macchina che si trova ad un incrocio deve prima o poi attraversarlo
+\item Liveness: Non possono verificarsi situazioni in cui nessuna macchina
+  nell'incrocio può muoversi
+\item Fault Tolerant: Il sistema deve funzionare in caso di guasti fisici o
+  logici. Un guasto fisico comporta che la macchina è attiva nella rete ma non
+  può muoversi. Un guasto logico comporta che la macchina non è più
+  raggiungibile nella rete, ma comunque presente fisicamente nell'ambiente.
+\item Distribuito: Le macchine si parlano tra di loro senza un server centrale
+  che potrebbe diventare un SPOF.
+\item Modulare (Scaling Transparency): E' possibile utilizzare il sistema su un
+  qualsiasi tipo di incrocio: è sufficiente cambiare il grafo di descrizione
+  dell'incrocio (non è necessario agire modificando la struttura del sistema e
+  degli algoritmi)
+\end{itemize}
+
+Struttura complessiva implementazione: Lo spazio fisico è partizionato in una
+griglia dove ogni macchina può occupare al più una cella. La griglia è poi
+rappresentata da un grafo orientato e pesato in cui i nodi rappresentano le
+singole celle della griglia. Si ha una collisione quando due auto vanno ad
+occupare la stessa cella nella griglia (lo stesso nodo del grafo). Le macchine
+sono dotate di sensori di prossimità, gps, e un modulo wifi per comunicare con
+le altre macchine. Una macchina può avanzare solo se il sensore di prossimità
+non rileva ostacoli e mediante il modulo gps la macchina è in grado di capire se
+si trova in prossimità di un incrocio. In quest'ultimo caso prima di avanzare
+deve coordinarsi con eventuali altre macchine presenti. Il coordinamento si
+traduce in una fase di elezione di un leader dell'incrocio, che poi deciderà
+quali macchine far passare.
+
+\paragraph{Aspetti distribuiti del sistema}
+
+\begin{itemize}
+\item Ogni macchina è un'entità indipendente con conoscenza parziale
+  dell'ambiente circostante (data dai suoi sensori).
+\item Le macchine si scoprono e parlano tra di loro autonomamente senza bisogno
+  di un server centrale.
+\item Fase di elezione del leader dell'incrocio. L'algoritmo scelto per
+  l'elezione è il bully.
+\end{itemize}
+
+\paragraph{Trasparenze del sistema}
+
+\begin{itemize}
+\item Access transparency: Non c'è un concetto di risorsa remota a cui le
+  macchine accedono. Le macchine utilizzano dati ricavati da sensori oppure
+  messaggi ricevuti da altre macchine.
+\item Location transparency: Una macchina comunica con i vicini senza conoscerne
+  la posizione fisica nell'ambiente.
+\item Concurrency transparency: Più macchine possono impegnare l'incrocio senza
+  interferire l'una con l'altra.
+\item Replication transparency: non pertinente con il problema.
+\item Failure transparency: sono ammessi fallimenti fisici e logici delle
+  macchine. Se la macchina si guasta fisicamente è lei stessa a "chiamare il
+  carro attrezzi" e quindi a rimuoversi dall'ambiente. Se la macchina si guasta
+  logicamente, è la macchina dietro che passato un certo timeout chiede
+  l'intervento di un carro attrezzi.
+\item Mobility transparency: non pertinente
+\item Performance transparency: non pertinente
+\item Scaling transparency: non è necessario modificare la struttura e gli
+  algoritmi del sistema al crescere delle macchine.
+\end{itemize}
+
+% In this chapter you describe the main problem, and an idea of the solution. It
+% is not necessary to be very detailed or formal, but it is important to explain
+% which are the main aims and issues from the point of view of Distributed
+% Systems:
+% \begin{itemize}
+% \item A description of the application.
+% \item The overall structure of the implementation: how resources are deployed, which are the players, the r\^oles.
+% \item The distributed system features (and the transparencies) and algorithms you intend to implement.
+% \item Your plan for testing the system.
+% \item A schedule for how you plan to carry our your design and implementation
+% \end{itemize}
+
+\chapter{Analysis}\label{ch:analysis}
+
+Come primo passaggio viene creato un processo "environment" dove viene salvato
+lo stato globale dell'incrocio. L'incrocio viene tradotto in un grafo orientato
+pesato, dove ogni nodo conterrà le seguenti informazioni:
+\begin{itemize}
+\item Nome
+\item Tipologia di nodo: TailNode(Nodo in coda) TopNode (Nodo in prossimità di
+  un incrocio) CrossNode(Nodo incrocio)
+\item Elenco di macchine che occupano il nodo stesso
+\end{itemize}
+Il peso degli archi del grafo viene assegnato in base alla distanza fisica tra i
+due nodi.
+Questo modulo viene interrogato dalle varie macchine per simulare dati relativi
+alla sensoristica.
+
+Ogni veicolo sarà implementato come un processo che quindi potrà interrogare i
+sensori per ottenere le informazioni su posizione, ostacoli, percorso più breve
+verso la sua destinazione.
+
+Le macchine sono in relazione client-server con l'environment. Ogni automobile è
+una macchina a stati finiti per la quale si prevede di utilizzare il behaviour
+di erlang gen\_statem. Gli stati principali per un veicolo sono:
+\begin{itemize}
+\item \texttt{INQUEQUE}: La macchina si trova in questo stato quando è in coda
+  (non è la prima macchina della fila)
+\item \texttt{DISCOVER}: La macchina è la prima della file. In questo stato la
+  macchina manda un broadcast per scoprire le auto vicine.
+\item \texttt{ELECTION}: La macchina è la prima della fila. E' in corso
+  l'elezione di un leader dell'incrocio
+\item \texttt{SLAVE}: L'elezione si è conclusa e la macchina non è leader. Mando
+  il mio percorso al leader e attendo risposta "verde"/"rosso".
+\item \texttt{M-FETCH}: La macchina è stata eletta leader dell'incrocio. Attendo
+  i percorsi delle macchine SLAVE.
+\item \texttt{M-COORD}: In base ai percorsi e alle priorità delle macchine mando
+  messaggi "verde"/"rosso" agli SLAVE.
+\item \texttt{CROSSING}: La macchina è in questo stato se si trova su un nodo
+  del grafo di tipo CrossNode.
+\item \texttt{PH-FAULT}: La macchina ha un guasto fisico.
+\end{itemize}
+
+Ogni veicolo può ricevere uno dei seguenti eventi:
+\begin{itemize}
+\item \texttt{disc}: La macchina è appena arrivata in prossimità dell'incrocio e
+  manda in broadcast un "discover" con il suo pid e il suo percorso. A livello
+  pratico per simulare il broadcast il messaggio di discover viene mandato
+  all'environment che poi rigira alle altre macchine. Queste quindi a loro volta
+  mandano un messaggio di "hellofrom" alla nuova macchina (con il loro
+  percorso).
+\item \texttt{disc\_tm}: lo stato \texttt{DISCOVER} ha un suo timeout. Una volta
+  trascorso viene innescato questo evento.
+\item \texttt{wait(tag:*)}: se la macchina si trova in stato \texttt{DISCOVER} e
+  riceve questo evento rimane nello stato \texttt{DISCOVER} e resetta il
+  timeout.
+\item \texttt{hello(pid)}: se la macchina si trova in stato \texttt{DISCOVER},
+  mi salvo il pid ricevuto tra i conosciuti.
+\item \texttt{elect}: Messaggio di \emph{election} dell'algoritmo bully.
+\item \texttt{coord}: Messaggio di \emph{coordinator} dell'algoritmo bully.
+\item \texttt{ans}: Messaggio di \emph{answer} dell'algoritmo bully.
+\item \texttt{elect\_tm}: Evento di timeout (elezione fallita) dell'algoritmo bully.
+\item \texttt{route}: messaggio contenente id, priorità, lista macchine con cui
+  è in conflitto.
+\item \texttt{route\_tm}: evento di timeout per lo stato \texttt{M-FETCH}.
+\item \texttt{green}: Messaggio che notifica a macchina in stato \texttt{SLAVE}
+  che può attraversare incrocio.
+\item \texttt{red}: Messaggio che notifica a macchina in stato \texttt{SLAVE}
+  che non può attraversare incrocio.
+\item \texttt{gr\_timeout}: evento di timeout per lo stato \texttt{SLAVE} e
+  \texttt{M-COORD}.
+\end{itemize}
+
+\begin{tikzpicture}[shorten >=1pt,
+  node distance=2.5cm,on grid,auto,
+  bend angle=30, font=\scriptsize\ttfamily, scale=0.3]
+  \node[state,initial,accepting] (queue)                 {INQUEUE};
+  \node[state,accepting] (disc) [right=of queue] {DISCOVER};
+  \node[state,accepting] (elec) [right=of disc,xshift=0.5cm]  {ELECTION};
+  \node[state,accepting] (slave) [xshift=1cm,above right=of elec]  {SLAVE};
+  \node[state,accepting] (m-fetch) [xshift=1cm,below right=of elec]  {M-FETCH};
+  \node[state,accepting] (m-coord) [right=of m-fetch,xshift=0.5cm]  {M-COORD};
+  \node[state,accepting] (cross) [above right=of m-coord]  {CROSSING};
+  \node[state,accepting,initial,initial text=fault] (fault) [below=of disc]  {PH-FAULT};
+  % \node[state,accepting]         (q_1) [right=of q_0] {$q_1$};
+  % \node[state,accepting]         (q_2) [right=of q_1] {$q_2$};
+  \path[->] (queue)   edge node {on\_top} (disc)
+            (disc)    edge [loop above] node [xshift=-0.5cm] {disc,hello,wait} ()
+                      edge node {disc\_tm} (elec)
+                        edge [bend right] node[yshift=-0.1cm] {elec} (elec)
+                        edge [bend left] node[yshift=0.1cm,xshift=0.7cm] {coord} (slave)
+              (elec)    edge [loop below] node {disc,elect,ans} ()
+                        edge node {coord} (slave)
+                        edge [bend right] node[yshift=0.45cm] {elec\_tm} (disc)
+                        edge node[xshift=-0.4cm,yshift=0.2cm] {master} (m-fetch)
+              (slave)   edge [loop above] node {disc} ()
+                        edge node {green} (cross)
+                        edge [bend right=50] node[xshift=-0.5cm,yshift=0.7cm] {red,gr\_tm} (disc)
+              (m-fetch) edge [loop above] node {route,disc} ()
+                        edge node {route\_tm} (m-coord)
+              (m-coord) edge [loop above] node {disc,route} ()
+                        edge [below] node [xshift=0.5cm] {green} (cross)
+                        edge [bend left=50] node {red,gr\_tm} (disc)
+              (cross)   edge [loop above] node {disc} ();
+\end{tikzpicture}
+
+Ogni veicolo ha un suo valore di priorità iniziale, che viene incrementato ogni
+volta che il veicolo riceve il messaggio \texttt{red} (lo può ricevere solo se è
+in stato \texttt{SLAVE} o \texttt{M-COORD}). Il leader dell'incrocio decide chi
+far passare nel seguente modo:
+\begin{itemize}
+\item Ordina le macchine per priorità;
+\item Farà sicuramente passare la prima.
+\item Calcola un insieme massimale di macchine indipendenti rispetto alla prima
+\end{itemize}
+
+% In this chapter, we describe in detail functional and non-functional
+% requirements of a solution for the problem. Ogni macchina ha un suo "semaforo"
+% interno: quando si trova in prossimità di un incrocio può passare solo se il suo
+% semaforo è verde
+
+% \section{Functional requirements}
+% Which functions must be offered to users / other programs?  Which are the input data and the output data? Which is the expected effect? 
+
+% \section{Non functional requirements}
+% Everything about mode and transparencies: availability, mobility, security, fault tolerance, etc.
+
+% Are there execution time bounds? Minimum data rates?
+
+% If requested, specific platforms/languages/middlewares requirements for the implementation can be decided here. (E.g.: if the project is on a SOA, we may request that functions are offered via SOAP or RESTful services). 
+
+
+
+% \chapter{Project}
+
+% This chapter is devoted to the description of the general architectures, and specific algorithms.
+
+% \section{Logical architecture}
+% Describe the components of your systems: modules/objects/components/services.
+% For each component, describe the functionalities it implements, and by who is used.
+
+% \section{Protocols and algorithms}
+% Communication between components.  UML sequence diagrams go here.
+
+% Also, put here a detailed description of distributed algorithms used to solve specific problems of the project.
+
+% \section{Physical architecture and deployment}
+% Which nodes and platforms involved, and where each component is deployed.
+
+% \section{Development plan}
+% Since it is difficult to predict just how hard implementing a new system will be, you should formulate as a set of ``tiers,'' where the basic tier is something you?re sure you can complete, and the additional tiers add more features, at both the application and the system level.
+
+% \chapter{Implementation}
+
+% Details about the implementation: every choice about platforms, languages, software/hardware, middlewares, which has not been decided in the requirements.
+
+
+% Important choices about implementation should be described here; e.g., peculiar data structures.
+
+
+% \chapter{Validation}
+
+% Check if requirements from Chapter~\ref{ch:analysis} have been fulfilled.
+% Quantitative tests (simulations) and screenshots of the interfaces are put here.
+
+
+% \chapter{Conclusions}
+
+% What has been done with respect to what has been promised in Chapters~\ref{ch:intro} and \ref{ch:analysis}, and what is left out.
+
+% \appendix
+
+% \chapter{Appendix}
+
+% In the Appendix you can put code snippets, snapshots, installation instructions, etc.
+
+
+% \chapter*{Evaluation}
+% Your system will be judged mainly on how it operates as a distributed system. The primary evaluation will be according to whether your system has the following attributes:
+% \begin{itemize}
+% \item  It should be an interesting distributed system, making use of some of the algorithms we have covered in class for distributed synchronization, replication, fault tolerance and recovery, security, etc.
+% \item The software should be well designed and well implemented, in terms of the overall architecture and the detailed realization.
+% \item You should devise and apply systematic testing procedures, at both the unit and systems levels.
+% \item The system should operate reliably and with good performance, even in the face of failures.
+% \end{itemize}
+% Important, but secondary considerations include:
+% \begin{itemize}
+% \item Time taken to do the project (the sooner the better, but do not miss details in order to end sooner)
+% \item  How nice is the application's appearance: does it have a nice interface or a compelling visual display?
+% \end{itemize}
+
+\end{document}
+
+
+% Local Variables:
+% ispell-dictionary: italiano
+% End:
