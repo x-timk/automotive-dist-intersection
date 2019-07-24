@@ -204,7 +204,7 @@ public class WindowGui {
 			startRand = (startRand + 1) % 4;
 			int stopRand = ThreadLocalRandom.current().nextInt(0, 4);
 
-			int speedRand = ThreadLocalRandom.current().nextInt(1000, 3000);
+			int speedRand = ThreadLocalRandom.current().nextInt(200, 1000);
 			
 		    // display/center the jdialog when the button is pressed
 			String car = "car" + randomNum;

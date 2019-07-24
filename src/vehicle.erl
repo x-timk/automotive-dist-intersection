@@ -41,15 +41,15 @@
 
 %% Valori Timeout di stati
 -define(STATE_WAIT_TIMEOUT, 2000).
--define(STATE_DISCOVER_TIMEOUT, 5000).
--define(STATE_ELECTION_TIMEOUT, 5000).
+-define(STATE_DISCOVER_TIMEOUT, 1000).
+-define(STATE_ELECTION_TIMEOUT, 1000).
 -define(BULLY_ANSWER_TIMEOUT, 1000).
--define(MASTER_FETCH_TIMEOUT, 5000).
+-define(MASTER_FETCH_TIMEOUT, 1000).
 -define(SLAVE_TIMEOUT, 10000).
 
--define(CROSSING_SPEED, 2500).
+-define(CROSSING_SPEED, 700).
 
--define(TOWTRUCK_THRESHOLD, 30).
+-define(TOWTRUCK_THRESHOLD, 2).
 %% Messaggio richiesta movimento veicolo
 
 -export([start_link/1]).
