@@ -6,6 +6,9 @@
 
 %% gen_event export stuff
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
+
+-export([check_car_status/2]).
+
 -include_lib("stdlib/include/assert.hrl").
 
 -record(world, {
@@ -278,6 +281,13 @@ add_car_to_graph(W, Name, Desc, VStart, Vstop, Speed, Prio) ->
     _Other -> ko
   end.
 
+check_car_status(Car, Node) ->
+  IsStalled = vehicle:is_stalled(Car),
+  if
+    IsStalled ->
+      delete_car(Car, Node);
+    not IsStalled -> ok
+  end.
 
 %% Send to java gui
 jgui_update_graph(Node, Mbox, G) ->
@@ -289,8 +299,8 @@ init(_Args) ->
   World = create_world(),
   {ok,World}.
 
-delete_car(CarName, Pos) -> 
-  gen_server:call(?MODULE, {delete_car, {CarName, Pos}}, ?GENSERVER_CALL_TIMEOUT).
+delete_car(CarName, Pos) ->
+  gen_server:cast(?MODULE, {delete_car, {CarName, Pos}}).
 
 spawn_car(CarName, CarDesc, StartPos, EndPos, Speed, Prio) ->
   try
@@ -324,16 +334,18 @@ handle_cast({disc, Msg={FromCar, _Route}},W) ->
   broadcast_discover(Msg, Cars),
   {noreply, W};
 handle_cast({check_fault, Node}, W = #world{undir = G}) ->
-  {Node, {Type, Cars}} = graph:get_vertex_label(G, Node),
-  NewCars = lists:filter(fun (Car) ->
-                             not vehicle:is_stalled(Car)
-                         end,
-                         Cars),
-  print("~p", [NewCars]),
-  graph:add_vertex(G, Node, {Type, NewCars}),
+  {Node, {_Type, Cars}} = graph:get_vertex_label(G, Node),
+  lists:foreach(fun(Car) ->
+                    spawn(?MODULE, check_car_status, [Car, Node])
+                end,
+                Cars),
+  {noreply, W};
+
+
+handle_cast({delete_car, {CarName, Pos}}, W) ->
+  delete_car_from_vertex(W#world.undir, Pos, CarName),
+  jgui_update_graph(W#world.gui_node, W#world.gui_mbox, W#world.undir),
   {noreply, W}.
-
-
 
 handle_call({posfree, {_FromCar, Position}}, _From, W) ->
   % vehicle:send_posfree_resp(FromCar, is_node_occupied(W#world.undir, Position)),
@@ -348,12 +360,6 @@ handle_call({move, {CarName, {CurrentPos, NextPos}}}, _From, W) ->
   print("Received move", []),
   %% Stampo posizione auto nel grafo
   print("~p", [get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))]),
-  jgui_update_graph(W#world.gui_node, W#world.gui_mbox, W#world.undir),
-  {reply, ok, W};
-
-handle_call({delete_car, {CarName, Pos}}, _From, W) ->
-  print("DELETE REQUEST",[]),
-  delete_car_from_vertex(W#world.undir, Pos, CarName),
   jgui_update_graph(W#world.gui_node, W#world.gui_mbox, W#world.undir),
   {reply, ok, W};
 
@@ -386,7 +392,7 @@ go() ->
 t() ->
   World = create_world(),
   gen_server:start_link({local, ?MODULE}, dim_env, World, []),
-  
+
   dim_env:spawn_car(car1, "LanciaDelta", i_nord2, o_sud3, 1000, 1),
   timer:sleep(1500),
 
