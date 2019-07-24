@@ -17,97 +17,120 @@
 %\begin{titlingpage}
 \maketitle
 \begin{abstract}
-  Lo scopo del presente documento è quello di descrivere una possibile soluzione
-  distribuita per il problema degli incroci stradali intelligenti.
+  Un sistema di incrocio stradale intelligente vuole essere una soluzione al
+  problema della congestione stradale. Con l'avvento dei sistemi wireless e
+  autonomici ci si chiede se sia possibile per i veicoli stradali poter decidere
+  direttamente tra di loro chi debba impegnare l'incrocio. Di seguito si indaga
+  una soluzione che permatta di eliminare le lanterne semaforiche in modo da
+  ridurre i tempi medi di attesa dei veicoli in coda.
 \end{abstract}
 %\end{titlingpage}
 
 \chapter{Introduction}\label{ch:intro}
 
-\paragraph{Descrizione dell'applicazione}
+La soluzione che viene proposta in questo lavoro vuole essere di tipo
+distribuito, dove i singoli veicoli sono entità indipendenti e con conoscenza
+parziale dell'ambiente circostante data dalla sensoristica di bordo. Compito dei
+veicoli è quello di formare una rete peer-to-peer che permetta loro di
+comunicare autonomamente, senza bisogno di un server centrale.
 
+% TODO: Da riconsiderare per capitolo 3.1
+% Inoltre la soluzione mira ad essere fisicamente plausibile, ipotizzando un
+% deploy in una situazione reale (o mondo reale)
+% soluzione fisicamente plausibile
+% al funzionamento fisico della sensoristica
+% Molte scelte sono state effettuate pensando al livello tecnologico della
+% sensoristica ad oggi disponibile; ad esempio è stato tenuto conto del fatto che
+% i dispositivi wireless hanno un raggio di azione limitato.
 
-Un sistema di incrocio stradale intelligente vuole essere una soluzione al
-problema della congestione stradale. Con l'avvento dei sistemi wireless ci si
-chiede se sia possibile per i veicoli stradali di poter decidere direttamente
-tra di loro chi debba impegnare l'incrocio, eliminando quindi i semafori. La
-soluzione proposta per il problema vuole soddisfare i seguenti requisiti:
-\begin{itemize}
-\item Sicurezza stradale: Le auto che attraversano l'incrocio non devono scontrarsi
-\item Fairness: Ogni macchina che si trova ad un incrocio deve prima o poi attraversarlo
-\item Liveness: Non possono verificarsi situazioni in cui nessuna macchina
-  nell'incrocio può muoversi
-\item Fault Tolerant: Il sistema deve funzionare in caso di guasti fisici o
+I principali requisiti che si vogliono soddisfare sono:
+\begin{description}
+\item[Sicurezza stradale] Le auto che attraversano l'incrocio non devono
+  scontrarsi.
+\item[Liveness] Ogni macchina che si trova ad un incrocio deve prima o poi
+  attraversarlo.
+\item[Fairness] Quando un'auto chiede di impegnare l'incrocio, esiste un tempo
+  limite entro cui le viene assegnato.
+\item[Deadlock freedom] Non possono verificarsi situazioni in cui nessuna
+  macchina nell'incrocio può muoversi.
+\item [Fault Tolerant] Il sistema deve funzionare in caso di guasti fisici o
   logici. Un guasto fisico comporta che la macchina è attiva nella rete ma non
   può muoversi. Un guasto logico comporta che la macchina non è più
   raggiungibile nella rete, ma comunque presente fisicamente nell'ambiente.
-\item Distribuito: Le macchine si parlano tra di loro senza un server centrale
+\item [Distribuito] Le macchine si parlano tra di loro senza un server centrale
   che potrebbe diventare un SPOF.
-\item Modulare (Scaling Transparency): E' possibile utilizzare il sistema su un
-  qualsiasi tipo di incrocio: è sufficiente cambiare il grafo di descrizione
-  dell'incrocio (non è necessario agire modificando la struttura del sistema e
-  degli algoritmi)
-\end{itemize}
+\item [Generale] E' possibile utilizzare il sistema su un qualsiasi tipo di
+  incrocio: è sufficiente cambiare il grafo di descrizione dell'incrocio (non è
+  necessario agire modificando la struttura del sistema e degli algoritmi).
+\end{description}
 
-Struttura complessiva implementazione: Lo spazio fisico è partizionato in una
-griglia dove ogni macchina può occupare al più una cella. La griglia è poi
-rappresentata da un grafo orientato e pesato in cui i nodi rappresentano le
-singole celle della griglia. Si ha una collisione quando due auto vanno ad
-occupare la stessa cella nella griglia (lo stesso nodo del grafo). Le macchine
-sono dotate di sensori di prossimità, gps, e un modulo wifi per comunicare con
-le altre macchine. Una macchina può avanzare solo se il sensore di prossimità
-non rileva ostacoli e mediante il modulo gps la macchina è in grado di capire se
-si trova in prossimità di un incrocio. In quest'ultimo caso prima di avanzare
-deve coordinarsi con eventuali altre macchine presenti. Il coordinamento si
-traduce in una fase di elezione di un leader dell'incrocio, che poi deciderà
-quali macchine far passare.
+\subsection{Struttura complessiva dell'implementazione}
 
-\paragraph{Aspetti distribuiti del sistema}
+Lo spazio fisico è partizionato in una griglia dove ogni macchina può occupare
+al più una cella. La griglia è poi rappresentata da un grafo orientato e pesato
+in cui i nodi rappresentano le singole celle della griglia. Si ha una collisione
+quando due auto vanno ad occupare la stessa cella nella griglia (lo stesso nodo
+del grafo). Le macchine sono dotate di sensori di prossimità, gps, e un modulo
+wifi per comunicare con le altre macchine. Una macchina può avanzare solo se il
+sensore di prossimità non rileva ostacoli e mediante il modulo gps la macchina è
+in grado di capire se si trova in prossimità di un incrocio. In quest'ultimo
+caso prima di avanzare deve coordinarsi con eventuali altre macchine presenti.
+Il coordinamento si traduce in una fase di elezione di un leader dell'incrocio,
+che poi deciderà quali macchine far passare.
 
-\begin{itemize}
-\item Ogni macchina è un'entità indipendente con conoscenza parziale
-  dell'ambiente circostante (data dai suoi sensori).
-\item Le macchine si scoprono e parlano tra di loro autonomamente senza bisogno
-  di un server centrale.
-\item Fase di elezione del leader dell'incrocio. L'algoritmo scelto per
-  l'elezione è il bully.
-\end{itemize}
 
-\paragraph{Trasparenze del sistema}
+Per testare il sistema è stato implementato un ambiente simulato le cui
+funzionalità rispecchino il più possibile quelle di un ambiente reale.
 
-\begin{itemize}
-\item Access transparency: Non c'è un concetto di risorsa remota a cui le
-  macchine accedono. Le macchine utilizzano dati ricavati da sensori oppure
-  messaggi ricevuti da altre macchine.
-\item Location transparency: Una macchina comunica con i vicini senza conoscerne
-  la posizione fisica nell'ambiente.
-\item Concurrency transparency: Più macchine possono impegnare l'incrocio senza
-  interferire l'una con l'altra.
-\item Replication transparency: non pertinente con il problema.
-\item Failure transparency: sono ammessi fallimenti fisici e logici delle
-  macchine. Se la macchina si guasta fisicamente è lei stessa a "chiamare il
-  carro attrezzi" e quindi a rimuoversi dall'ambiente. Se la macchina si guasta
-  logicamente, è la macchina dietro che passato un certo timeout chiede
-  l'intervento di un carro attrezzi.
-\item Mobility transparency: non pertinente
-\item Performance transparency: non pertinente
-\item Scaling transparency: non è necessario modificare la struttura e gli
-  algoritmi del sistema al crescere delle macchine.
-\end{itemize}
+% TODO: Mettere in sezione 2.2
+% \paragraph{Trasparenze del sistema}
 
-% In this chapter you describe the main problem, and an idea of the solution. It
-% is not necessary to be very detailed or formal, but it is important to explain
-% which are the main aims and issues from the point of view of Distributed
-% Systems:
 % \begin{itemize}
-% \item A description of the application.
-% \item The overall structure of the implementation: how resources are deployed, which are the players, the r\^oles.
-% \item The distributed system features (and the transparencies) and algorithms you intend to implement.
-% \item Your plan for testing the system.
-% \item A schedule for how you plan to carry our your design and implementation
+% \item Access transparency: Non c'è un concetto di risorsa remota a cui le
+%   macchine accedono. Le macchine utilizzano dati ricavati da sensori oppure
+%   messaggi ricevuti da altre macchine.
+% \item Location transparency: Una macchina comunica con i vicini senza conoscerne
+%   la posizione fisica nell'ambiente.
+% \item Concurrency transparency: Più macchine possono impegnare l'incrocio senza
+%   interferire l'una con l'altra.
+% \item Replication transparency: non pertinente con il problema.
+% \item Failure transparency: sono ammessi fallimenti fisici e logici delle
+%   macchine. Se la macchina si guasta fisicamente è lei stessa a "chiamare il
+%   carro attrezzi" e quindi a rimuoversi dall'ambiente. Se la macchina si guasta
+%   logicamente, è la macchina dietro che passato un certo timeout chiede
+%   l'intervento di un carro attrezzi.
+% \item Mobility transparency: non pertinente
+% \item Performance transparency: non pertinente
+% \item Scaling transparency: non è necessario modificare la struttura e gli
+%   algoritmi del sistema al crescere delle macchine.
 % \end{itemize}
 
 \chapter{Analysis}\label{ch:analysis}
+
+%% REQUISITI FUNZIONALI
+% auto:
+% - interrogare sensore prossimità
+% - non muoversi qualora ci sia una macchina ferma più avanti
+% - conoscere posizione attuale (in generale l'intero suo perscorso)
+% - poter riconoscere se si trova in prossimità di un incrocio/in un incrocio/in coda.
+% - riconoscere eventuali macchine guaste davanti e richiedere intervento carro attrezzi
+% - muoversi
+% - poter inviare messaggi alle singole macchine o in broadcast in modo affidabile
+% - essere in grado coordinarsi con le altre auto per attraversare incrocio
+
+% environment:
+% - mantenere coerente lo stato del grafo di descrizione dell'incrocio.
+% - simulare intervento carro attrezzi (rimuove l'auto dal mondo fisico)
+% - simulare risposta alle query del sensore prossimità dell'auto
+% - simulare propagazione messaggio broadcast di un auto alle altre auto a portata wireless
+
+% gui:
+% - poter visualizzare lo stato dell'incrocio per monitorare il funzionamento
+% - poter inserire nella simulazione nuove auto
+% - mostare informazioni sui veicoli
+
+
+
 
 Come primo passaggio viene creato un processo "environment" dove viene salvato
 lo stato globale dell'incrocio. L'incrocio viene tradotto in un grafo orientato
@@ -221,80 +244,80 @@ far passare nel seguente modo:
 \item Calcola un insieme massimale di macchine indipendenti rispetto alla prima
 \end{itemize}
 
-% In this chapter, we describe in detail functional and non-functional
-% requirements of a solution for the problem. Ogni macchina ha un suo "semaforo"
-% interno: quando si trova in prossimità di un incrocio può passare solo se il suo
-% semaforo è verde
+In this chapter, we describe in detail functional and non-functional
+requirements of a solution for the problem. Ogni macchina ha un suo "semaforo"
+interno: quando si trova in prossimità di un incrocio può passare solo se il suo
+semaforo è verde
 
-% \section{Functional requirements}
-% Which functions must be offered to users / other programs?  Which are the input data and the output data? Which is the expected effect? 
+\section{Functional requirements}
+Which functions must be offered to users / other programs?  Which are the input data and the output data? Which is the expected effect? 
 
-% \section{Non functional requirements}
-% Everything about mode and transparencies: availability, mobility, security, fault tolerance, etc.
+\section{Non functional requirements}
+Everything about mode and transparencies: availability, mobility, security, fault tolerance, etc.
 
-% Are there execution time bounds? Minimum data rates?
+Are there execution time bounds? Minimum data rates?
 
-% If requested, specific platforms/languages/middlewares requirements for the implementation can be decided here. (E.g.: if the project is on a SOA, we may request that functions are offered via SOAP or RESTful services). 
-
-
-
-% \chapter{Project}
-
-% This chapter is devoted to the description of the general architectures, and specific algorithms.
-
-% \section{Logical architecture}
-% Describe the components of your systems: modules/objects/components/services.
-% For each component, describe the functionalities it implements, and by who is used.
-
-% \section{Protocols and algorithms}
-% Communication between components.  UML sequence diagrams go here.
-
-% Also, put here a detailed description of distributed algorithms used to solve specific problems of the project.
-
-% \section{Physical architecture and deployment}
-% Which nodes and platforms involved, and where each component is deployed.
-
-% \section{Development plan}
-% Since it is difficult to predict just how hard implementing a new system will be, you should formulate as a set of ``tiers,'' where the basic tier is something you?re sure you can complete, and the additional tiers add more features, at both the application and the system level.
-
-% \chapter{Implementation}
-
-% Details about the implementation: every choice about platforms, languages, software/hardware, middlewares, which has not been decided in the requirements.
+If requested, specific platforms/languages/middlewares requirements for the implementation can be decided here. (E.g.: if the project is on a SOA, we may request that functions are offered via SOAP or RESTful services). 
 
 
-% Important choices about implementation should be described here; e.g., peculiar data structures.
+
+\chapter{Project}
+
+This chapter is devoted to the description of the general architectures, and specific algorithms.
+
+\section{Logical architecture}
+Describe the components of your systems: modules/objects/components/services.
+For each component, describe the functionalities it implements, and by who is used.
+
+\section{Protocols and algorithms}
+Communication between components.  UML sequence diagrams go here.
+
+Also, put here a detailed description of distributed algorithms used to solve specific problems of the project.
+
+\section{Physical architecture and deployment}
+Which nodes and platforms involved, and where each component is deployed.
+
+\section{Development plan}
+Since it is difficult to predict just how hard implementing a new system will be, you should formulate as a set of ``tiers,'' where the basic tier is something you?re sure you can complete, and the additional tiers add more features, at both the application and the system level.
+
+\chapter{Implementation}
+
+Details about the implementation: every choice about platforms, languages, software/hardware, middlewares, which has not been decided in the requirements.
 
 
-% \chapter{Validation}
-
-% Check if requirements from Chapter~\ref{ch:analysis} have been fulfilled.
-% Quantitative tests (simulations) and screenshots of the interfaces are put here.
+Important choices about implementation should be described here; e.g., peculiar data structures.
 
 
-% \chapter{Conclusions}
+\chapter{Validation}
 
-% What has been done with respect to what has been promised in Chapters~\ref{ch:intro} and \ref{ch:analysis}, and what is left out.
-
-% \appendix
-
-% \chapter{Appendix}
-
-% In the Appendix you can put code snippets, snapshots, installation instructions, etc.
+Check if requirements from Chapter~\ref{ch:analysis} have been fulfilled.
+Quantitative tests (simulations) and screenshots of the interfaces are put here.
 
 
-% \chapter*{Evaluation}
-% Your system will be judged mainly on how it operates as a distributed system. The primary evaluation will be according to whether your system has the following attributes:
-% \begin{itemize}
-% \item  It should be an interesting distributed system, making use of some of the algorithms we have covered in class for distributed synchronization, replication, fault tolerance and recovery, security, etc.
-% \item The software should be well designed and well implemented, in terms of the overall architecture and the detailed realization.
-% \item You should devise and apply systematic testing procedures, at both the unit and systems levels.
-% \item The system should operate reliably and with good performance, even in the face of failures.
-% \end{itemize}
-% Important, but secondary considerations include:
-% \begin{itemize}
-% \item Time taken to do the project (the sooner the better, but do not miss details in order to end sooner)
-% \item  How nice is the application's appearance: does it have a nice interface or a compelling visual display?
-% \end{itemize}
+\chapter{Conclusions}
+
+What has been done with respect to what has been promised in Chapters~\ref{ch:intro} and \ref{ch:analysis}, and what is left out.
+
+\appendix
+
+\chapter{Appendix}
+
+In the Appendix you can put code snippets, snapshots, installation instructions, etc.
+
+
+\chapter*{Evaluation}
+Your system will be judged mainly on how it operates as a distributed system. The primary evaluation will be according to whether your system has the following attributes:
+\begin{itemize}
+\item  It should be an interesting distributed system, making use of some of the algorithms we have covered in class for distributed synchronization, replication, fault tolerance and recovery, security, etc.
+\item The software should be well designed and well implemented, in terms of the overall architecture and the detailed realization.
+\item You should devise and apply systematic testing procedures, at both the unit and systems levels.
+\item The system should operate reliably and with good performance, even in the face of failures.
+\end{itemize}
+Important, but secondary considerations include:
+\begin{itemize}
+\item Time taken to do the project (the sooner the better, but do not miss details in order to end sooner)
+\item  How nice is the application's appearance: does it have a nice interface or a compelling visual display?
+\end{itemize}
 
 \end{document}
 
