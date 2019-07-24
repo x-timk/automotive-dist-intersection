@@ -14,6 +14,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.SwingConstants;
 import javax.swing.text.DefaultCaret;
 
 import java.awt.event.ActionEvent;
@@ -53,14 +54,17 @@ public class WindowGui {
 
 	private int startRand = 0;
 	
-	public static void spawn_car(OtpConnection connection, String car, String desc, String start, String stop, int speed) {
-        OtpErlangObject[] funargs = new OtpErlangObject[6];
+	private static AutoCarSpawner autospawner;
+	
+	public void spawn_car(OtpConnection connection, String car, String desc, String start, String stop, int speed, int prio, double faultprob) {
+        OtpErlangObject[] funargs = new OtpErlangObject[7];
         funargs[0] = new OtpErlangAtom(car);
         funargs[1] = new OtpErlangString(desc);
         funargs[2] = new OtpErlangAtom(start);
         funargs[3] = new OtpErlangAtom(stop);
         funargs[4] = new OtpErlangInt(speed);
-        funargs[5] = new OtpErlangInt(0);
+        funargs[5] = new OtpErlangInt(prio);
+        funargs[6] = new OtpErlangDouble(faultprob);
         OtpErlangList funargslist = new OtpErlangList(funargs);
         try {
 	        connection.sendRPC("dim_env","spawn_car",funargslist);
@@ -81,10 +85,13 @@ public class WindowGui {
 		Iterator it = cars.iterator();
 		String carsin = "";
 		while(it.hasNext()){
-			carsin = carsin + ", ";
+			carsin = carsin + " ";
 			carsin = carsin + it.next();
+			carsin = carsin + " ";
 		}
 		labels[x][y].setText(carsin);
+		labels[x][y].setHorizontalAlignment(SwingConstants.CENTER);
+		labels[x][y].setVerticalAlignment(SwingConstants.CENTER);		
 		labels[x][y].setForeground(Color.BLACK);
 
 		
@@ -100,6 +107,8 @@ public class WindowGui {
 			break;
 		case "red":
 			labels[x][y].setForeground(Color.RED);
+		case "pink":
+			labels[x][y].setForeground(Color.PINK);
 		}
 		
 		
@@ -158,6 +167,10 @@ public class WindowGui {
 				window.frame.setVisible(true);
 		        ErlMBox receiver = new ErlMBox(window, node);
 		        receiver.start();
+//		        AutoCarSpawner spawner = new AutoCarSpawner(window, connection);
+//		        spawner.start();
+		        autospawner = new AutoCarSpawner(window, connection);
+		        autospawner.start();
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -203,25 +216,53 @@ public class WindowGui {
 			String[] stops = {"o_nord3", "o_est3", "o_ovest3", "o_sud3"};
 			startRand = (startRand + 1) % 4;
 			int stopRand = ThreadLocalRandom.current().nextInt(0, 4);
-
 			int speedRand = ThreadLocalRandom.current().nextInt(200, 1000);
-			
-		    // display/center the jdialog when the button is pressed
-			String car = "car" + randomNum;
-//			JFrame j = new JFrame(car);
-//			j.setBounds(50,50,150,150);
-//			jframemap.put(car, j);
-//			j.setVisible(true);
-			
-		    spawn_car(connection, car, "Fiat Panda", starts[startRand], stops[stopRand], speedRand);
-//		    JDialog d = new JDialog(frame, "Hello", true);
-//		    d.setLocationRelativeTo(frame);
-//		    d.setVisible(true);
+			String car = "car" + randomNum;			
+		    spawn_car(connection, car, "Fiat Panda", starts[startRand], stops[stopRand], speedRand, 0, 0.5);
 		  }
 		});
 
 	    b.setBounds(200,200,95,30);
 	    panel2.add(b);
+
+		JButton b2 = new JButton("AutoSpawn Start");
+		b2.addActionListener(new ActionListener()
+		{
+		  public void actionPerformed(ActionEvent e)
+		  {
+			  autospawner.begin();
+		  }
+		});
+	    b2.setBounds(200,200,95,30);
+	    panel2.add(b2);
+
+		JButton b3 = new JButton("AutoSpawn Stop");
+		b3.addActionListener(new ActionListener()
+		{
+		  public void actionPerformed(ActionEvent e)
+		  {
+			  autospawner.gracefulstop();
+		  }
+		});
+	    b3.setBounds(200,200,95,30);
+	    panel2.add(b3);
+	    
+		JButton b4 = new JButton("Spawn Miculan");
+		b4.addActionListener(new ActionListener()
+		{
+		  public void actionPerformed(ActionEvent e)
+		  {
+				String[] starts = {"i_nord3", "i_est3", "i_ovest3", "i_sud3"};
+				String[] stops = {"o_nord3", "o_est3", "o_ovest3", "o_sud3"};
+				startRand = (startRand + 1) % 4;
+				int stopRand = ThreadLocalRandom.current().nextInt(0, 4);	
+				String car = "Miculan";
+				spawn_car(connection, car, "Honda", starts[startRand], stops[stopRand], 100, 10, 0);
+		  }
+		});
+	    b4.setBounds(200,200,95,30);
+	    panel2.add(b4);
+	    
 	    frame2.setContentPane(panel2);
 	    frame2.setVisible(true);
 
