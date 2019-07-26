@@ -72,8 +72,7 @@
     conflictGraph = [],
     failedMovingAttempts = 0,
     faultProb,
-    gui_mbox = mbox,
-    gui_node = 'jv@Altro-MB.local'
+    jgui = [{mbox, 'jv@Altro-MB.local'}]
     }).
 
 
@@ -274,11 +273,20 @@ mis([H | Conflicts], GreenList) ->
   mis(NewConflicts, NewGreenList).
 
 jgui_update_car_state(State, CarData) ->
-  {CarData#cardata.gui_mbox, CarData#cardata.gui_node} ! {carstate, {State, CarData}}.
-
+  lists:foreach(
+    fun(Gui) -> 
+      Gui ! {carstate, {State, CarData}}
+    end,
+    CarData#cardata.jgui
+    ).
 jgui_update_car_color(Color, CarData) ->
-  {CarData#cardata.gui_mbox, CarData#cardata.gui_node} ! {carcolor, {Color, CarData}}.
-
+  % {CarData#cardata.gui_mbox, CarData#cardata.gui_node} ! {carcolor, {Color, CarData}}.
+  lists:foreach(
+    fun(Gui) -> 
+      Gui ! {carcolor, {Color, CarData}}
+    end,
+    CarData#cardata.jgui
+    ).
 
 inqueue(enter, _OldState, CarData) ->
   jgui_update_car_state(?FUNCTION_NAME, CarData),

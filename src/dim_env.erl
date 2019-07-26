@@ -14,8 +14,7 @@
 -record(world, {
   dir,
   undir,
-  gui_mbox = mbox,
-  gui_node = 'jv@Altro-MB.local'
+  jgui = [{mbox, 'jv@Altro-MB.local'}]
 }).
 
 %% portata antenna wireless a bordo di ogni auto
@@ -290,8 +289,13 @@ check_car_status(Car, Node) ->
   end.
 
 %% Send to java gui
-jgui_update_graph(Node, Mbox, G) ->
-  {Mbox, Node} ! {undirgraph, {get_vertex_cars_array(G, graph:vertices(G))}}.
+jgui_update_graph(Jgui, G) ->
+  lists:foreach(
+    fun(Gui) -> 
+      Gui ! {undirgraph, {get_vertex_cars_array(G, graph:vertices(G))}}
+    end,
+    Jgui
+    ).
 
 %% gen_event stuff
 init(_Args) ->
@@ -309,6 +313,10 @@ spawn_car(CarName, CarDesc, StartPos, EndPos, Speed, Prio, FaultProb) ->
     exit:{timeout,_} -> {error, timeout};
     _:_ -> {error, timeout}
   end.
+
+add_jgui_endpoint(Mbox, Node) ->
+  gen_server:call(?MODULE, {addjgui, Mbox, Node}).
+
 broadcast_disc(FromCar) ->
   gen_server:cast(?MODULE, {disc, FromCar}).
 
@@ -344,8 +352,13 @@ handle_cast({check_fault, Node}, W = #world{undir = G}) ->
 
 handle_cast({delete_car, {CarName, Pos}}, W) ->
   delete_car_from_vertex(W#world.undir, Pos, CarName),
-  jgui_update_graph(W#world.gui_node, W#world.gui_mbox, W#world.undir),
+  jgui_update_graph(W#world.jgui, W#world.undir),
   {noreply, W}.
+
+handle_call({addjgui, Mbox, Node}, _From, W) ->
+  % vehicle:send_posfree_resp(FromCar, is_node_occupied(W#world.undir, Position)),
+  NewWorld = W#world{ jgui = [ {Mbox, Node} | W#world.jgui] },
+  {reply, ok, NewWorld};
 
 handle_call({posfree, {_FromCar, Position}}, _From, W) ->
   % vehicle:send_posfree_resp(FromCar, is_node_occupied(W#world.undir, Position)),
@@ -360,7 +373,7 @@ handle_call({move, {CarName, {CurrentPos, NextPos}}}, _From, W) ->
   print("Received move", []),
   %% Stampo posizione auto nel grafo
   print("~p", [get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))]),
-  jgui_update_graph(W#world.gui_node, W#world.gui_mbox, W#world.undir),
+  jgui_update_graph(W#world.jgui, W#world.undir),
   {reply, ok, W};
 
 handle_call({spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed, Prio, FaultProb}}, _From, W) ->
@@ -370,7 +383,7 @@ handle_call({spawn_car, {CarName, CarDesc, StartPos, EndPos, Speed, Prio, FaultP
     false ->
       add_car_to_graph(W, CarName, CarDesc, StartPos, EndPos, Speed, Prio, FaultProb),
       print("~p", [get_vertex_cars_array(W#world.undir, graph:vertices(W#world.undir))]),
-      jgui_update_graph(W#world.gui_node, W#world.gui_mbox, W#world.undir),
+      jgui_update_graph(W#world.jgui, W#world.undir),
       {reply, CarName, W};
     true ->
       request_towtruck(StartPos),
