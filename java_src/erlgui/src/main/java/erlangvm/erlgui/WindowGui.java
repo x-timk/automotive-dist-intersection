@@ -2,21 +2,25 @@ package erlangvm.erlgui;
 
 import java.awt.Color;
 import java.awt.EventQueue;
+import java.awt.Font;
 
 import javax.swing.BorderFactory;
 import javax.swing.DefaultBoundedRangeModel;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
 
 import com.ericsson.otp.erlang.*;
 
 import java.awt.GridLayout;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JSlider;
 import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
@@ -24,8 +28,13 @@ import javax.swing.text.DefaultCaret;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-
-
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
@@ -36,6 +45,9 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class WindowGui {
 
+	private static WindowGui window;
+	
+	private JFrame login;
 	private JFrame frame;
 	private JFrame frame2;
 	private JFrame frame3;
@@ -65,6 +77,42 @@ public class WindowGui {
 	private JSlider slider;
 	
 	private double faultprob = 0;
+
+	public boolean start_env(OtpConnection connection, String jguiMbox, String jguiNode) {
+        OtpErlangObject[] funargs = new OtpErlangObject[2];
+        funargs[0] = new OtpErlangAtom(jguiMbox);
+        funargs[1] = new OtpErlangAtom(jguiNode);
+        OtpErlangList funargslist = new OtpErlangList(funargs);
+        
+//        OtpErlangObject[] empty_funargs = new OtpErlangObject[0];
+//        OtpErlangList empty_funargs_list = new OtpErlangList(empty_funargs);
+
+        // start environment
+//        try {
+//	        connection.sendRPC("dim_env","go",empty_funargs_list);
+//	        OtpErlangObject received = connection.receiveRPC(); 
+//	        System.out.println(received.toString());
+//        }
+//        catch (Exception e) {
+//        	e.printStackTrace();
+//        }
+        
+        // passaggio parametri jgui
+        try {
+	        connection.sendRPC("dim_env","add_jgui_endpoint",funargslist);
+	        OtpErlangTuple received = (OtpErlangTuple)connection.receiveRPC();
+	        System.out.println(received.elementAt(0).toString()  + " --- " +received.toString());
+	        if(received.elementAt(0).toString().equals("badrpc")){
+	        	System.out.println("ASDSD");
+	        	return false;
+	        }
+        }
+        catch (Exception e) {
+        	e.printStackTrace();
+        }
+        return true;
+        
+	}
 	
 	public void spawn_car(OtpConnection connection, String car, String desc, String start, String stop, int speed, int prio, double faultprob) {
         OtpErlangObject[] funargs = new OtpErlangObject[7];
@@ -132,26 +180,26 @@ public class WindowGui {
 	
 	public static void main(String[] args) {
 		
-		OtpNode n1 = null;
-		OtpSelf self = null;
-		OtpPeer peer = null;
+//		OtpNode n1 = null;
+//		OtpSelf self = null;
+//		OtpPeer peer = null;
 		
 		String remotePeer = "node2@Altro-MB.local";
         try {
         	
-	        self = new OtpSelf("javaclient", "guitar" ); 
-	        peer = new OtpPeer(remotePeer);
-	        n1 = new OtpNode("jv@Altro-MB.local", "guitar");
+//	        self = new OtpSelf("javaclient", "guitar" ); 
+//	        peer = new OtpPeer(remotePeer);
+//	        n1 = new OtpNode("jv@Altro-MB.local", "guitar");
 
 //	        App.remote  = new OtpPeer(App.remoteNode);
-	        connection = self.connect(peer);
+//	        connection = self.connect(peer);
 	        
         }
         catch (Exception e) {
         	e.printStackTrace();
         }
         
-        final OtpNode node = n1;
+//        final OtpNode node = n1;
 
         
 //        spawn_car("car3", "Fiat Panda", "i_est3", "o_sud3", 1000);
@@ -175,14 +223,13 @@ public class WindowGui {
 		EventQueue.invokeLater(new Runnable() {
 		public void run() {
 			try {
-				WindowGui window = new WindowGui();
-				window.frame.setVisible(true);
-		        ErlMBox receiver = new ErlMBox(window, node);
-		        receiver.start();
+				window = new WindowGui();
+				
+//		        ErlMBox receiver = new ErlMBox(window, node);
+//		        receiver.start();
 //		        AutoCarSpawner spawner = new AutoCarSpawner(window, connection);
 //		        spawner.start();
-		        autospawner = new AutoCarSpawner(window, connection);
-		        autospawner.start();
+
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -205,6 +252,84 @@ public class WindowGui {
 	 * Initialize the contents of the frame.
 	 */
 	private void initialize() {
+		
+		login = new JFrame();
+		login.setBounds(300,300,800,250);
+		login.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		login.setLayout(new GridLayout(2,3,1,1));
+
+		
+//		JPanel loginPanel = new JPanel(new GridLayout(5,5,1,1));
+		JLabel remoteLabel = new JLabel("<html>"+"Inserire nome nodo remoto e ip del nodo erlang"+"</html>");
+		login.add(remoteLabel);
+		JTextField remoteErlangNode = new JTextField("envnode");
+		remoteErlangNode.setBounds(50,50,50,30);
+		login.add(remoteErlangNode);
+		
+		JLabel at = new JLabel("@");
+		at.setHorizontalAlignment(SwingConstants.CENTER);
+		at.setVerticalAlignment(SwingConstants.CENTER);
+		at.setFont(new Font(at.getFont().getName(), Font.PLAIN, 25));
+		login.add(at);
+
+		JTextField remoteErlangIp = new JTextField("192.168.1.100");
+		remoteErlangIp.setBounds(50,50,50,30);
+		login.add(remoteErlangIp);
+		
+		JButton go = new JButton("Let's Go!");
+		login.add(go);
+		
+		Enumeration e;
+		ArrayList<String> availableIp = new ArrayList<String>();
+		try {
+			e = NetworkInterface.getNetworkInterfaces();
+			while(e.hasMoreElements())
+			{
+			    NetworkInterface n = (NetworkInterface) e.nextElement();
+			    Enumeration ee = n.getInetAddresses();
+			    while (ee.hasMoreElements())
+			    {
+			        InetAddress i = (InetAddress) ee.nextElement();
+			        availableIp.add(i.getHostAddress());
+			        System.out.println(i.getHostAddress());
+			    }
+			}
+		} catch (SocketException e2) {
+			// TODO Auto-generated catch block
+			e2.printStackTrace();
+		}
+		
+		JLabel localLabel = new JLabel("<html>" + "Scegliere un nome qualsiasi per il nodo locale e selezionare ip locale" + "</html>");
+		login.add(localLabel);
+		
+		JTextField localErlangNode = new JTextField("jguinode");
+		localErlangNode.setBounds(50,50,50,30);
+		login.add(localErlangNode);
+		
+		JLabel at2 = new JLabel("@");
+		at2.setHorizontalAlignment(SwingConstants.CENTER);
+		at2.setVerticalAlignment(SwingConstants.CENTER);
+		at2.setFont(new Font(at.getFont().getName(), Font.PLAIN, 25));
+		login.add(at2);
+		
+		JComboBox ips = new JComboBox(availableIp.toArray());
+		login.add(ips);
+
+//		JTextField localErlangIp = new JTextField("Local IP");
+//		localErlangIp.setBounds(50,50,50,30);
+//		login.add(localErlangIp);
+		
+//		JButton goo = new JButton("Let's Go!");
+//		login.add(goo);
+		
+		
+
+
+		
+
+		
+		login.setVisible(true);
+		
 		frame = new JFrame();
 		frame.setBounds(0, 0, 850, 700);
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -248,6 +373,7 @@ public class WindowGui {
 	    panel2.add(b2);
 
 		JButton b3 = new JButton("AutoSpawn Stop");
+		b3.setEnabled(false);
 		b3.addActionListener(new ActionListener()
 		{
 		  public void actionPerformed(ActionEvent e)
@@ -318,7 +444,6 @@ public class WindowGui {
 	    
 	    
 	    frame2.setContentPane(panel2);
-	    frame2.setVisible(true);
 
 		frame3 = new JFrame();
 		frame3.setBounds(1050, 0, 400, 700);
@@ -337,7 +462,6 @@ public class WindowGui {
 		
 
 
-		frame3.setVisible(true);
 
 		
 		for (int i =0; i<(squaredim); i++){
@@ -418,6 +542,80 @@ public class WindowGui {
 		
 		frame.setContentPane(panel);
 		
+		frame.setVisible(false);
+	    frame2.setVisible(false);
+		frame3.setVisible(false);
+		go.addActionListener(new ActionListener()
+		{
+		  public void actionPerformed(ActionEvent e)
+		  {
+			OtpNode node = null;
+			try {
+				String nodename = remoteErlangNode.getText() + "@" + remoteErlangIp.getText();
+				System.out.println("NodeName is: " + nodename);
+//				node = new OtpNode(nodename);
+				System.out.println("DONE1");
+				
+		        OtpPeer peer = new OtpPeer(nodename);
+		        
+		        String localnodeName = localErlangNode.getText() + "@" + ips.getSelectedItem().toString();
+		        System.out.println("Local Node is: " + localnodeName);
+				node = new OtpNode(localnodeName, "guitar");
+		        System.out.println("DONE2");
+
+				
+		        System.out.println("DONE3");
+
+//		        n1 = new OtpNode("jv@Altro-MB.local", "guitar");
+
+//		        App.remote  = new OtpPeer(App.remoteNode);
+		        OtpSelf self = new OtpSelf("javaclient", "guitar" );
+
+		        connection = self.connect(peer);
+
+		        System.out.println("DONE4");
+		        
+				ErlMBox receiver = new ErlMBox(window, node);
+				receiver.start();
+		        
+		    	if(!start_env(connection, "mbox", localnodeName)){
+					JOptionPane.showMessageDialog(frame,
+						    "Probably environment is not running on remote node.",
+						    "Error",
+						    JOptionPane.ERROR_MESSAGE);
+					System.exit(0);
+		    	}
+
+		        autospawner = new AutoCarSpawner(window, connection);
+		        autospawner.start();
+			    
+		        
+		        frame.setVisible(true);
+			    frame2.setVisible(true);
+			    frame3.setVisible(true);
+			    
+			    login.setVisible(false);
+		        
+			} catch (IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+				JOptionPane.showMessageDialog(frame,
+					    "Probably Erlang Node is Down.",
+					    "Error",
+					    JOptionPane.ERROR_MESSAGE);
+				System.exit(0);
+			} catch (OtpAuthException e1) {
+				// TODO Auto-generated catch block
+				JOptionPane.showMessageDialog(frame,
+					    "Probably cookie auth is wrong.",
+					    "Auth Error",
+					    JOptionPane.ERROR_MESSAGE);
+				e1.printStackTrace();
+				System.exit(0);
+			}
+
+		  }
+		});
 //		labels[6][5].setText("name");
 	}
 

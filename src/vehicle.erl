@@ -72,7 +72,7 @@
     conflictGraph = [],
     failedMovingAttempts = 0,
     faultProb,
-    jgui = [{mbox, 'jv@Altro-MB.local'}]
+    jgui = []
     }).
 
 
@@ -95,8 +95,8 @@ callback_mode() ->
 %% 4) Lista di eventuali opzioni avanzate per la state machine
 %% L'idea è che quando faccio spawn di una macchina la lancio con i parametri {Env, Name, Desc, Route, Speed}
 start_link(Data) ->
-  {Env, Name, Desc, Route, Speed, Prio, FaultProb} = Data,
-  CarData = #cardata{env = Env, name = Name, desc = Desc, route = Route, neighbourPids = [], speed = Speed, priority = Prio, faultProb = FaultProb},
+  {Env, Name, Desc, Route, Speed, Prio, FaultProb, JguiList} = Data,
+  CarData = #cardata{env = Env, name = Name, desc = Desc, route = Route, neighbourPids = [], speed = Speed, priority = Prio, faultProb = FaultProb, jgui = JguiList},
   gen_statem:start_link({local,CarData#cardata.name}, ?MODULE, CarData, []).
 
 

@@ -2,7 +2,7 @@
 -export([go/0,t/0]).
 
 %% Export Public API genserver
--export([spawn_car/7, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3, delete_car/2, request_towtruck/1]).
+-export([spawn_car/7, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3, delete_car/2, request_towtruck/1, add_jgui_endpoint/2]).
 
 %% gen_event export stuff
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
@@ -14,7 +14,7 @@
 -record(world, {
   dir,
   undir,
-  jgui = [{mbox, 'jv@Altro-MB.local'}]
+  jgui = []
 }).
 
 %% portata antenna wireless a bordo di ogni auto
@@ -274,7 +274,7 @@ get_vertex_cars_array(G, [H|T]) ->
 %% Speed: velocita' movimento (es: con un valore 2000 l'auto tenta di muoversi ogni 2 secondi)
 add_car_to_graph(W, Name, Desc, VStart, Vstop, Speed, Prio, FaultProb) ->
   Path = get_min_path(W#world.dir, VStart, Vstop),
-  {Res, _Ot} = vehicle:start_link({?MODULE, Name, Desc, get_vertex_type_array(W#world.dir, Path), Speed, Prio, FaultProb}),
+  {Res, _Ot} = vehicle:start_link({?MODULE, Name, Desc, get_vertex_type_array(W#world.dir, Path), Speed, Prio, FaultProb, W#world.jgui}),
   case Res of
     ok -> add_car_to_vertex(W#world.undir, VStart, Name);
     _Other -> ko
@@ -358,7 +358,7 @@ handle_cast({delete_car, {CarName, Pos}}, W) ->
 handle_call({addjgui, Mbox, Node}, _From, W) ->
   % vehicle:send_posfree_resp(FromCar, is_node_occupied(W#world.undir, Position)),
   NewWorld = W#world{ jgui = [ {Mbox, Node} | W#world.jgui] },
-  {reply, ok, NewWorld};
+  {reply, {ok}, NewWorld};
 
 handle_call({posfree, {_FromCar, Position}}, _From, W) ->
   % vehicle:send_posfree_resp(FromCar, is_node_occupied(W#world.undir, Position)),
