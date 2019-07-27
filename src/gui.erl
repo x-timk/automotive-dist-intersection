@@ -61,25 +61,27 @@ init(_Options) ->
                                         InfoPanel,
                                         [{label, "Cars"}]),
   wxPanel:setSizer(InfoPanel, InfoPanelSizer),
-  Text1 = wxTextCtrl:new(TopSplitter,
-                         ?wxID_ANY,
-                         [{style, ?wxTE_READONLY bor ?wxTE_CENTRE},
-                          {value, "Info delle macchine"}]),
-  Text2 = wxTextCtrl:new(TopSplitter,
+  Text1 = wxTextCtrl:new(InfoPanel,
                          ?wxID_ANY,
                          [{style, ?wxTE_READONLY bor ?wxTE_CENTRE},
                           {value, "Info delle macchine"}]),
   wxSizer:add(InfoPanelSizer, Text1, [{proportion, 1}, {flag, ?wxEXPAND}]),
-  wxSizer:add(InfoPanelSizer, Text2, [{proportion, 1}, {flag, ?wxEXPAND}]),
+  %% wxSizer:add(InfoPanelSizer, Text2, [{proportion, 1}, {flag, ?wxEXPAND}]),
   DrawingPanel = wxPanel:new(TopSplitter, [{style, ?wxFULL_REPAINT_ON_RESIZE}]),
   DrawingSizer = wxStaticBoxSizer:new(?wxVERTICAL,
                                       DrawingPanel,
                                       [{label, "Simulation"}]),
-  wxPanel:connect(DrawingPanel, paint, [callback]),
   wxPanel:setSizer(DrawingPanel, DrawingSizer),
+  Text2 = wxTextCtrl:new(DrawingPanel,
+                         ?wxID_ANY,
+                         [{style, ?wxTE_READONLY bor ?wxTE_CENTRE},
+                          {value, "Info delle macchine"}]),
+  wxSizer:add(DrawingSizer, Text2, [{proportion, 1}, {flag, ?wxEXPAND}]),
+  wxPanel:connect(DrawingPanel, paint, [callback]),
   wxSplitterWindow:splitVertically(TopSplitter, InfoPanel, DrawingPanel,
                                    [{sashPosition, 0}]),
   wxFrame:show(Frame),
+  wxWindow:refresh(DrawingPanel),
   wxSplitterWindow:setSashGravity(TopSplitter,   1.0),
   {Frame, #state{win=Frame, canvas=DrawingPanel, cars=Cars}}.
 
@@ -103,12 +105,12 @@ handle_sync_event(#wx{event=#wxPaint{}}, _wxObj,
   {W, H} = wxPanel:getSize(Canvas),
   GraphBitmap = wxBitmap:new(W, H),
   DC = wxMemoryDC:new(GraphBitmap),
-  draw(DC, initNodePositions()),
-  drawCars(DC, initNodePositions(), Cars),
   CDC = wxWindowDC:new(Canvas),
-  wxDC:blit(CDC, {0,0},
-            {wxBitmap:getWidth(GraphBitmap), wxBitmap:getHeight(GraphBitmap)},
-            DC, {0,0}),
+  draw(CDC, initNodePositions()),
+  drawCars(CDC, initNodePositions(), Cars),
+  %% wxDC:blit(CDC, {0,0},
+  %%           {wxBitmap:getWidth(GraphBitmap), wxBitmap:getHeight(GraphBitmap)},
+  %%           DC, {0,0}),
   wxWindowDC:destroy(CDC),
   wxMemoryDC:destroy(DC),
   wxBitmap:destroy(GraphBitmap),
@@ -184,18 +186,40 @@ initNodePositions() ->
    }.
 
 
-draw(DC, Nodes) ->
+draw(DC, Nodes = #{c_nordest := Pt1, c_sudovest := Pt2, c_nordovest := Pt3}) ->
   {W, H} = wxDC:getSize(DC),
+  Normalize = fun({X, Y}) ->
+                  {trunc(X/10*W), trunc(Y/10*H)}
+              end,
+  Center = fun({X, Y}) -> {X - 0.5, Y -0.5} end,
   wxDC:setBrush(DC, ?wxWHITE_BRUSH),
   wx:foreach(fun ({_Node, {XC, YC}}) ->
-                 Normalize = fun(X, Y) ->
-                                 {trunc(X/10*W), trunc(Y/10*H)}
-                             end,
-                 Point = Normalize(XC-0.5, YC-0.5),
-                 Size = Normalize(1, 1),
+                 Point = Normalize({XC-0.5, YC-0.5}),
+                 Size = Normalize({1, 1}),
                  wxDC:drawRectangle(DC, Point, Size)
              end,
-             maps:to_list(Nodes)).
+             maps:to_list(Nodes)),
+  Overlay = wxOverlay:new(),
+  ODC = wxDCOverlay:new(Overlay, DC),
+  wxDC:setBrush(DC, ?wxRED_BRUSH),
+  GC = wxGraphicsContext:create(DC),
+  wxGraphicsContext:setPen(GC, ?wxRED_PEN),
+  Path = wxGraphicsContext:createPath(GC),
+  wxGraphicsPath:moveToPoint(Path, Normalize(Pt1)),
+  {X1, _Y1} = Normalize(Pt1),
+  {X2, Y2} = Normalize(Pt2),
+  {X3, Y3} = Normalize(Pt3),
+  %% wxGraphicsPath:addLineToPoint(Path, )
+  wxGraphicsPath:addArcToPoint(Path, X3, Y3, X2, Y2, abs(X1-X2)),
+  wxGraphicsContext:strokePath(GC, Path),
+  %% wxDC:drawArc(DC,
+  %%              Normalize(Pt1),
+  %%              Normalize(Pt2),
+  %%              Normalize(C)),
+  wxGraphicsObject:destroy(Path),
+  wxGraphicsObject:destroy(GC),
+  wxDCOverlay:destroy(ODC),
+  wxOverlay:destroy(Overlay).
 
 drawCars(DC, Nodes, Cars) ->
   {W, H} = wxDC:getSize(DC),
@@ -208,6 +232,8 @@ drawCars(DC, Nodes, Cars) ->
                  {CX, CY} = Normalize(maps:get(Pos, Nodes)),
                  PX = CX - (TW div 2),
                  PY = CY - (TH div 2),
-                 wxDC:drawText(DC, Text, {PX, PY})
+                 {BW, BH} = Normalize({ 1,1 }),
+                 wxDC:drawLabel(DC, Text,
+                                {PX, PY, BW, BH })
              end,
              maps:to_list(Cars)).
