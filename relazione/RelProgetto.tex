@@ -2,7 +2,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage[english,italian]{babel}
-\usepackage{cleveref}
+\usepackage[italian]{cleveref}
 \usepackage{tikz}
 \usetikzlibrary{automata,positioning,topaths}
 
@@ -339,7 +339,8 @@ rilevi un ostacolo oppure si arrivi in prossimità dell'incrocio.
     angle=30, font=\footnotesize\ttfamily]
     \node[state,initial, initial text=enter/\_] (queue) {INQUEUE};%
     \node[state] (disc) [right=of queue, xshift=1cm] {DISCOVER};%
-    \path[->] (queue) edge [loop above] node {car\_mv/\_} ()%
+    \path[->] (queue) edge [loop above] node[align=center]%
+    {car\_mv/\_\\fault/no} ()%
                       edge node {car\_mv/\_} (disc);%
   \end{tikzpicture}
 \end{figure}
@@ -534,6 +535,36 @@ veicolo gestisce i seguenti eventi:
     edge node [xshift=-0.5cm, yshift=0.2cm]{red/\_} (disc);
   \end{tikzpicture}
 \end{figure}
+
+\paragraph{\texttt{CROSSING}} Il veicolo impegna l'incrocio secondo la sua rotta
+e con velocità costante fino a liberarlo. L'evento \texttt{car\_mv} scandisce il
+movimento del veicolo: alla sua ricezione il veicolo interroga i sensori di
+prossimità, per poi avanzare alla cella successiva in assenza di ostacoli
+nell'incrocio. Lasciata alle spalle l'ultima cella dell'incrocio, il veicolo
+ritorna nello stato \texttt{INQUEUE}. Agli eventi \texttt{disc} il veicolo è
+tenuto a rispondere con un messaggio di \texttt{wait} fintanto che si trova in
+questo stato.
+
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}[shorten >=1pt, node distance=2.5cm,on grid,auto, bend
+    angle=30, font=\footnotesize\ttfamily]
+    \node[state,initial, initial text=enter/\_] (cross) [xshift=1cm] {CROSSING};%
+    \node[right=of cross,state,xshift=1cm] (queue) {INQUEUE};%
+    \path[->] (cross) edge [loop above] node[align=center]%
+    {car\_mv/\_\\disc/wait\\fault/no} ()%
+    edge node {car\_mv/\_} (queue);%
+  \end{tikzpicture}
+\end{figure}
+
+
+\paragraph{\texttt{PH-FAULT}}
+Ad ogni istante il veicolo può subire un guasto fisico e quindi doversi fermare
+in attesa che il soccorso stradale intervenga. Un guasto visico viene segnalato
+dall'evento \texttt{ph\_fault} che obbliga il veicolo ad entrare nello stato
+\texttt{PH-FAULT}.
+
 
 \newpage
 This chapter is devoted to the description of the general architectures, and specific algorithms.
