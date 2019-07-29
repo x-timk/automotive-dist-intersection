@@ -2,6 +2,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage[english,italian]{babel}
+\usepackage{cleveref}
 \usepackage{tikz}
 \usetikzlibrary{automata,positioning,topaths}
 
@@ -244,38 +245,39 @@ Ogni veicolo può ricevere uno dei seguenti eventi:
   \texttt{M-COORD}.
 \end{itemize}
 
-\begin{tikzpicture}[shorten >=1pt,
-  node distance=2.5cm,on grid,auto,
-  bend angle=30, font=\scriptsize\ttfamily, scale=0.3]
-  \node[state,initial,accepting] (queue)                 {INQUEUE};
-  \node[state,accepting] (disc) [right=of queue] {DISCOVER};
-  \node[state,accepting] (elec) [right=of disc,xshift=0.5cm]  {ELECTION};
-  \node[state,accepting] (slave) [xshift=1cm,above right=of elec]  {SLAVE};
-  \node[state,accepting] (m-fetch) [xshift=1cm,below right=of elec]  {M-FETCH};
-  \node[state,accepting] (m-coord) [right=of m-fetch,xshift=0.5cm]  {M-COORD};
-  \node[state,accepting] (cross) [above right=of m-coord]  {CROSSING};
-  \node[state,accepting,initial,initial text=fault] (fault) [below=of disc]  {PH-FAULT};
-  % \node[state,accepting]         (q_1) [right=of q_0] {$q_1$};
-  % \node[state,accepting]         (q_2) [right=of q_1] {$q_2$};
-  \path[->] (queue)   edge node {on\_top} (disc)
-            (disc)    edge [loop above] node [xshift=-0.5cm] {disc,hello,wait} ()
-                      edge node {disc\_tm} (elec)
-                        edge [bend right] node[yshift=-0.1cm] {elec} (elec)
-                        edge [bend left] node[yshift=0.1cm,xshift=0.7cm] {coord} (slave)
-              (elec)    edge [loop below] node {disc,elect,ans} ()
-                        edge node {coord} (slave)
-                        edge [bend right] node[yshift=0.45cm] {elec\_tm} (disc)
-                        edge node[xshift=-0.4cm,yshift=0.2cm] {master} (m-fetch)
-              (slave)   edge [loop above] node {disc} ()
-                        edge node {green} (cross)
-                        edge [bend right=50] node[xshift=-0.5cm,yshift=0.7cm] {red,gr\_tm} (disc)
-              (m-fetch) edge [loop above] node {route,disc} ()
-                        edge node {route\_tm} (m-coord)
-              (m-coord) edge [loop above] node {disc,route} ()
-                        edge [below] node [xshift=0.5cm] {green} (cross)
-                        edge [bend left=50] node {red,gr\_tm} (disc)
-              (cross)   edge [loop above] node {disc} ();
-\end{tikzpicture}
+\begin{figure}
+  \centering
+  \begin{tikzpicture}[shorten >=1pt, node distance=2.5cm,on grid,auto, bend
+    angle=30, font=\footnotesize\ttfamily]
+    \node[state,initial] (queue) {INQUEUE};%
+    \node[state] (disc) [right=of queue] {DISCOVER};%
+    \node[state] (elec) [right=of disc,xshift=0.5cm] {ELECTION};%
+    \node[state] (slave) [xshift=1cm,above right=of elec] {SLAVE};%
+    \node[state] (m-fetch) [xshift=1cm,below right=of elec] {M-FETCH};%
+    \node[state] (m-coord) [right=of m-fetch,xshift=0.5cm] {M-COORD};%
+    \node[state] (cross) [above right=of m-coord] {CROSSING};%
+    \node[state,initial,initial text=fault] (fault) [below=of disc]
+    {PH-FAULT};%
+    \path[->]%
+    (queue) edge node {on\_top} (disc)%
+    (disc) edge [loop above] node[xshift=-0.2cm] {disc,hello,wait} ()%
+    edge node {disc\_tm} (elec)%
+    edge [bend right] node[yshift=-0.5cm] {elec} (elec)%
+    edge [bend left] node[yshift=0.1cm,xshift=0.7cm] {coord} (slave)%
+    (elec) edge [loop below] node {disc,elect,ans} ()%
+    edge node {coord} (slave)%
+    edge [bend right] node[yshift=0.45cm] {elec\_tm} (disc)%
+    edge node[xshift=-0.4cm,yshift=0.2cm] {master} (m-fetch)%
+    (slave) edge [loop
+    above] node {disc} () edge node {green} (cross) edge [bend right=50]
+          node[xshift=-0.5cm,yshift=0.7cm] {red,gr\_tm} (disc) (m-fetch) edge
+          [loop above] node {route,disc} () edge node {route\_tm} (m-coord)
+          (m-coord) edge [loop above] node {disc,route} () edge [below] node
+          [xshift=0.5cm] {green} (cross) edge [bend left=50] node {red,gr\_tm}
+          (disc) (cross) edge [loop above] node {disc} ();
+ \end{tikzpicture}
+ \caption{Car: Finite State Machine}
+\end{figure}
 
 Ogni veicolo ha un suo valore di priorità iniziale, che viene incrementato ogni
 volta che il veicolo riceve il messaggio \texttt{red} (lo può ricevere solo se è
@@ -293,32 +295,133 @@ far passare nel seguente modo:
 Le componenti principali della soluzione sono:
 \begin{itemize}
 \item Modulo Veicolo: utilizzato per rappresentare il singolo veicolo;
-\item Modulo Ambiente: utilizzato per rappresentare l'ambiente e simulare interazione
- del veicolo con la sensoristica;
+\item Modulo Environment: utilizzato per rappresentare l'ambiente e simulare
+  interazione del veicolo con la sensoristica;
 \item Interfaccia grafica: modulo utilizzato per monitorare e interagire con l'ambiente
 \end{itemize}
 
 Di seguito vengono descritte nel dettaglio le funzionalità implementate da ogni componente
 \subsection{Veicolo}
-Ogni veicolo è una macchina a stati finiti, in cui le azioni intraprese non dipendono solo dagli
- eventi esterni ricevuti, ma anche dallo stato in cui il veicolo si trova. 
-Gli stati principali per un veicolo sono:
+Ogni veicolo è una macchina a stati finiti il cui output dipende dallo stato
+attuale e dagli eventi in input. È naturale, quindi, descrivere un veicolo come
+una macchia di Mealy, in cui gli input sono generici eventi e gli output sono
+messaggi inviati. Gli stati principali per un veicolo sono:
 \begin{itemize}
-\item \texttt{INQUEUE}: Il veicolo si trova in questo stato quando stà transitando in una zona
- non in prossimità di un incrocio;
-\item \texttt{DISCOVER}: Il veicolo si trova in prossimità di un incrocio e deve effettuare il
- \emph{discover} delle auto nelle vicinanze
-\item \texttt{ELECTION}: Il veicolo si trova in prossimità di un incrocio. E' in corso
-  l'elezione di un leader dell'incrocio
-\item \texttt{SLAVE}: L'elezione si è conclusa e il veicolo non è leader, quindi resta in attesa di istruzioni da parte del leader;
-\item \texttt{MASTER}: Il veicolo è stato eletto leader dell'incrocio, e quindi procede inviando istruzioni ai veicoli SLAVE;
-\item \texttt{CROSSING}: Il veicolo stà impegnando l'incrocio; 
-\item \texttt{PH-FAULT}: Il veicolo ha rilevato un guasto fisico. Un guasto fisico può avvenire in un qualsiasi momento.
+\item \texttt{INQUEUE}: Il veicolo si trova in questo stato quando stà
+  transitando in una zona non in prossimità di un incrocio;
+\item \texttt{DISCOVER}: Il veicolo si trova in prossimità di un incrocio e deve
+  effettuare il \emph{discover} delle auto nelle vicinanze
+\item \texttt{WAIT}: Il veicolo deve attendere il completamento di un elezione
+  già in corso o il transito di altri veicoli nell'incrocio.
+\item \texttt{ELECTION}: Il veicolo si trova in prossimità di un incrocio. E' in
+  corso l'elezione di un leader dell'incrocio
+\item \texttt{SLAVE}: L'elezione si è conclusa e il veicolo non è leader, quindi
+  resta in attesa di istruzioni da parte del leader;
+\item \texttt{MASTER}: Il veicolo è stato eletto leader dell'incrocio, e quindi
+  procede inviando istruzioni ai veicoli SLAVE;
+\item \texttt{CROSSING}: Il veicolo stà impegnando l'incrocio;
+\item \texttt{PH-FAULT}: Il veicolo ha rilevato un guasto fisico. Un guasto
+  fisico può avvenire in un qualsiasi momento.
 \end{itemize}
 
+Per ogni stato si elencano gli eventi che il veicolo è tenuto a gestire, come ad
+esempio messaggi ricevuti o timer interni, e le azioni intraprese allo scaturire
+di tali eventi. Gli eventi non menzionati in un certo stato vanno ignorati.
+
+\paragraph{\texttt{INQUEUE}}
+Il veicolo avanza di una cella nello spazio fisico ogni \emph{n} secondi
+seguendo la sua rotta e rallentando nel caso in cui il sensore di prossimità
+rilevi un ostacolo oppure si arrivi in prossimità dell'incrocio.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}[shorten >=1pt, node distance=2.5cm,on grid,auto, bend
+    angle=30, font=\footnotesize\ttfamily]
+    \node[state,initial, initial text=enter/\_] (queue) {INQUEUE};%
+    \node[state] (disc) [right=of queue, xshift=1cm] {DISCOVER};%
+    \path[->] (queue) edge [loop above] node {car\_mv/\_} ()%
+                      edge node {car\_mv/\_} (disc);%
+  \end{tikzpicture}
+\end{figure}
+
+L'evento \texttt{car\_mv} rappresenta l'avanzamento del veicolo lungo la sua
+rotta. Alla ricezioni di questo evento il veicolo interroga il sensore di
+prossimità: se vi sono ostacoli, il veicolo si ferma in attesa di un nuovo
+evento \texttt{car\_mv}; se la strada è libera procede con la sua corsa fino ad
+occupare la cella successiva nella griglia. A questo punto, se la nuova cella
+risulta essere in prossimità di un incrocio, il veicolo entra nello stato
+\texttt{DISCOVER}, altrimenti rimane nello stesso stato in attesa di un nuovo
+evento \texttt{car\_mv}.
+
+Se il veicolo rileva un ostacolo che lo obbliga a una fermata prolungata, avvia
+una chiamata al soccorso stradale in merito alla posizione dell'ostacolo. Sarà
+poi il soccorso stradale a rimuovere l'eventuale veicolo dalla posizione
+segnalata, se effettivamente guasto. Il soccorso stradale è una funzionalità
+offerta dal modulo \emph{Environment}.
+
+\paragraph{\texttt{DISCOVER}}
+In prossimità di un incrocio il veicolo deve capire se vi siano altri veicoli in
+prossimità dello stesso incrocio. Viene quindi applicato il protocollo di
+\emph{discovery} descritto nella \cref{sec:protalg}.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}[shorten >=1pt, node distance=2.5cm,on grid,auto, bend
+    angle=30, font=\footnotesize\ttfamily]
+    \node[state, initial, initial text=enter/disc] (disc) {DISCOVER};%
+    \node[state] (elec) [above right=of disc,xshift=2.5cm] {ELECTION};%
+    \node[state] (slave) [xshift=2.5cm,below right=of disc] {SLAVE};%
+    \node[state] (wait) [below=of disc] {WAIT};%
+    \path[->] (disc) edge [loop above] node[align=center]
+    {disc/hello\\hello/\_\\fault/no} ()%
+    edge node[align=center, xshift=0.7cm,yshift=0.2cm] {disc\_tm/\_\\elect/\_} (elec)%
+    edge node {wait/\_} (wait)%
+    edge node {coord/\_} (slave);%
+  \end{tikzpicture}
+\end{figure}
+Quando il veicolo entra nello stato \texttt{DISCOVER} invia il messaggio
+broadcast \texttt{disc}, che verrà ricevuto dai soli veicoli a portata wireless,
+contenente la propria identità e la propria rotta. Rimane poi in attesa dei
+seguenti messaggi fino allo scadere di un timeout (evento \texttt{disc\_tm}):
+\begin{itemize}
+\item \texttt{disc}: Un altro veicolo ha segnalato la sua presenza
+  nell'incrocio. Il veicolo memorizza le informazioni sul mittente e risponde
+  con un messaggio \texttt{hello} per segnalare la propria presenza.
+\item \texttt{hello}: Ricevuto in risposta a un \texttt{disc}; il veicolo
+  memorizza le informazioni sul mittente.
+\item \texttt{wait}: Ricevuto in risposta a un \texttt{disc} quando un elezione
+  è già in corso o un veicolo sta impegnando l'incrocio. Il veicolo entra nello
+  stato \texttt{WAIT} per un breve periodo prima di ritornare nella fase di
+  \emph{discovery}.
+\item \texttt{elect}: Un altro veicolo ha indetto un'elezione. Il veicolo entra
+  nello stato \texttt{ELECTION} per partecipare all'elezione.
+\item \texttt{coord}: Un altro veicolo è stato eletto il leader dell'incrocio.
+  Il veicolo memorizza l'identità del leader e entra nello stato \texttt{SLAVE}.
+\item \texttt{fault}: Il soccorso stradale ha richiesto lo stato del veicolo.
+  Non essendoci anomalie, viene inviata una risposta negativa.
+\end{itemize}
+
+Allo scadere del timeout \texttt{disc\_tm} il veicolo entra nello stato
+\texttt{ELECTION} e indice un'elezione con i veicoli di cui conosce l'identità.
+
+\paragraph{\texttt{WAIT}}
+Il veicolo entra in questo stato a seguito della ricezione di un messaggio
+\texttt{wait} e vi rimane fino allo scadere del timeout \texttt{wait\_tm}.
+Eventuali messaggi ricevuti in questo stato vengo ignorati.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}[shorten >=1pt, node distance=2.5cm,on grid,auto, bend
+    angle=30, font=\footnotesize\ttfamily]
+    \node[state] (disc) {DISCOVER};%
+    \node[state] (wait) [below=of disc] {WAIT};%
+    \path[->] (disc) edge [bend left] node {wait/\_} (wait)%
+              (wait) edge [bend left] node {wait\_tm/\_} (disc);
+  \end{tikzpicture}
+\end{figure}
 
 
-
+\newpage
 This chapter is devoted to the description of the general architectures, and specific algorithms.
 
 \section{Logical architecture}
@@ -327,6 +430,7 @@ For each component, describe the functionalities it implements, and by who is us
 
 
 \section{Protocols and algorithms}
+\label{sec:protalg}
 Communication between components.  UML sequence diagrams go here.
 
 Also, put here a detailed description of distributed algorithms used to solve specific problems of the project.
