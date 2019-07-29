@@ -420,6 +420,120 @@ Eventuali messaggi ricevuti in questo stato vengo ignorati.
   \end{tikzpicture}
 \end{figure}
 
+\paragraph{\texttt{ELECTION}}
+Quando il veicolo entra in questo stato indice un elezione secondo l'algoritmo
+\emph{bully}: invia un messaggio \texttt{elect} ai soli veicoli con un
+identificativo maggiore del proprio e attende risposta. Il veicolo con
+l'identificativo più alto si elegge leader (evento \texttt{master}), entrando
+quindi nello stato \texttt{MASTER} prima di inviare il messaggio \texttt{coord}
+agli altri partecipanti.
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}[shorten >=1pt, node distance=2.5cm,on grid,auto, bend
+    angle=30, font=\footnotesize\ttfamily]
+    \node[state, initial, initial text=enter/elect] (elec) {ELECTION};%
+    \node[state] (slave) [above right=of elec, xshift=2.5cm] {SLAVE};%
+    \node[state] (master) [xshift=2.5cm,below right=of elec] {MASTER};%
+    \node[state] (disc) [below=of elec] {DISCOVER};%
+    \path[->] (elec) edge [loop above] node[align=center]
+    {elect/ans\\ans/\_\\disc/wait\\fault/no} ()%
+    edge node {coord/\_} (slave)
+    edge node {master/\_} (master)
+    edge node {elect\_tm/\_} (disc);
+  \end{tikzpicture}
+\end{figure}
+
+Il veicolo in questo stato gestisce i seguenti eventi:
+\begin{itemize}
+\item \texttt{elect}: Corrisponde al messaggio \emph{election} dell'algoritmo
+  \emph{bully}; il veicolo è tenuto a rispondere con un messaggio \texttt{ans}.
+\item \texttt{ans}: Corrisponde al messaggio \emph{answer} dell'algoritmo
+  \emph{bully}.
+\item \texttt{coord}: Corrisponde al messaggio \emph{coordinator} dell'algoritmo
+  \emph{bully}; il veicolo entra nello stato \texttt{SLAVE}.
+\item \texttt{elect\_tm}: Il veicolo non ha ricevuto il messaggio \texttt{coord}
+  entro il tempo prestabilito, quindi assume che l'elezione sia fallita e
+  ritorna nello stato \texttt{DISCOVER}.
+\item \texttt{master}: Il veicolo si elegge leader e entra nello stato
+  \texttt{MASTER}.
+\item \texttt{disc}: Un nuovo veicolo è giunto in prossimità dell'incrocio.
+  Essendoci un elezione in corso, il veicolo invia un \texttt{wait} in risposta.
+\item \texttt{fault}: Il soccorso stradale ha richiesto lo stato del veicolo.
+  Non essendoci anomalie, viene inviata una risposta negativa.
+\end{itemize}
+
+\paragraph{\texttt{SLAVE}}
+Il veicolo, conoscendo le rotte degli altri partecipanti, calcola con quali di
+esse la sua rotta è in conflitto e lo comunica al leader tramite il messaggio
+\texttt{conflict}. Quindi rimane in attesa di istruzioni da parte del leader per
+un tempo prestabilito, scaduto il quale (evento \texttt{slave\_tm}) lo assume
+guasto e ritorna nello stato \texttt{DISCOVER}. In questo stato il veicolo
+gestisce i seguenti eventi:
+\begin{itemize}
+\item \texttt{green}: Il veicolo può attraversare l'incrocio, quindi entra nello
+  stato \texttt{CROSSING}.
+\item \texttt{red}: Il veicolo non è autorizzato ad impegnare l'incrocio, quindi
+  aumenta la sua priorità e ritorna nello stato \texttt{DISCOVER}.
+\item \texttt{elect}: Il veicolo inoltra un \texttt{ans} al mittente ancora
+  ignaro del leader.
+\item \texttt{disc}: Un nuovo veicolo è giunto in prossimità dell'incrocio. Non
+  avendo partecipato all'elezione ormai conclusasi, il veicolo invia un
+  \texttt{wait} in risposta.
+\item \texttt{fault}: Il soccorso stradale ha richiesto lo stato del veicolo.
+  Non essendoci anomalie, viene inviata una risposta negativa.
+\end{itemize}
+
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}[shorten >=1pt, node distance=2.5cm,on grid,auto, bend
+    angle=30, font=\footnotesize\ttfamily]
+    \node[state,intial, initial text=enter/conflict] (slave) {SLAVE};%
+    \node[state] (cross) [xshift=2.5cm,above right=of slave] {CROSSING};%
+    \node[state] (disc) [xshift=2.5cm,below right=of slave] {DISCOVER};%
+    \path[->] (slave) edge [loop above] node[align=center]
+    {elect/ans\\disc/wait\\fault/no} ()%
+    edge node [xshift=0.6cm, yshift=0.2cm]{green/\_} (cross)
+    edge node [align=center, xshift=-0.5cm, yshift=0.2cm]{red/\_\\slave\_tm/\_} (disc);
+  \end{tikzpicture}
+\end{figure}
+
+\paragraph{\texttt{MASTER}}
+Il veicolo calcola con quali partecipanti è in conflitto e rimane in attesa dei
+messaggi \texttt{conflict} fino allo scadere di un timeout (evento
+\texttt{master\_tm}). Ricevuto l'evento \texttt{master\_tm}, procede al calcolo
+di un insieme massimale di veicoli le cui rotte non sono in conflitto e invia
+messaggi \texttt{green} e \texttt{red} di conseguenza. In questo stato il
+veicolo gestisce i seguenti eventi:
+\begin{itemize}
+\item \texttt{green}: Il veicolo può attraversare l'incrocio, quindi entra nello
+  stato \texttt{CROSSING}.
+\item \texttt{red}: Il veicolo non è autorizzato ad impegnare l'incrocio, quindi
+  aumenta la sua priorità e ritorna nello stato \texttt{DISCOVER}.
+\item \texttt{elect}: Il veicolo inoltra un \texttt{ans} al mittente ancora
+  ignaro del leader.
+\item \texttt{disc}: Un nuovo veicolo è giunto in prossimità dell'incrocio. Non
+  avendo partecipato all'elezione ormai conclusasi, il veicolo invia un
+  \texttt{wait} in risposta.
+\item \texttt{fault}: Il soccorso stradale ha richiesto lo stato del veicolo.
+  Non essendoci anomalie, viene inviata una risposta negativa.
+\end{itemize}
+
+
+\begin{figure}[h]
+  \centering
+  \begin{tikzpicture}[shorten >=1pt, node distance=2.5cm,on grid,auto, bend
+    angle=30, font=\footnotesize\ttfamily]
+    \node[state,intial, initial text=enter/\_] (master) {MASTER};%
+    \node[state] (cross) [xshift=2.5cm,above right=of master] {CROSSING};%
+    \node[state] (disc) [xshift=2.5cm,below right=of master] {DISCOVER};%
+    \path[->] (master) edge [loop above] node[align=center]
+    {conflict/\_\\master\_tm/\{green,red\}\\elect/ans\\disc/wait\\fault/no} ()%
+    edge node [xshift=0.6cm, yshift=0.2cm]{green/\_} (cross)
+    edge node [xshift=-0.5cm, yshift=0.2cm]{red/\_} (disc);
+  \end{tikzpicture}
+\end{figure}
 
 \newpage
 This chapter is devoted to the description of the general architectures, and specific algorithms.
