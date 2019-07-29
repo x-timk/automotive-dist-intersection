@@ -490,7 +490,7 @@ gestisce i seguenti eventi:
   \centering
   \begin{tikzpicture}[shorten >=1pt, node distance=2.5cm,on grid,auto, bend
     angle=30, font=\footnotesize\ttfamily]
-    \node[state,intial, initial text=enter/conflict] (slave) {SLAVE};%
+    \node[state,initial, initial text=enter/conflict] (slave) {SLAVE};%
     \node[state] (cross) [xshift=2.5cm,above right=of slave] {CROSSING};%
     \node[state] (disc) [xshift=2.5cm,below right=of slave] {DISCOVER};%
     \path[->] (slave) edge [loop above] node[align=center]
@@ -526,7 +526,7 @@ veicolo gestisce i seguenti eventi:
   \centering
   \begin{tikzpicture}[shorten >=1pt, node distance=2.5cm,on grid,auto, bend
     angle=30, font=\footnotesize\ttfamily]
-    \node[state,intial, initial text=enter/\_] (master) {MASTER};%
+    \node[state,initial, initial text=enter/\_] (master) {MASTER};%
     \node[state] (cross) [xshift=2.5cm,above right=of master] {CROSSING};%
     \node[state] (disc) [xshift=2.5cm,below right=of master] {DISCOVER};%
     \path[->] (master) edge [loop above] node[align=center]
