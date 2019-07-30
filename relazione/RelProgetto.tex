@@ -681,7 +681,8 @@ il veicolo ritenterà il \emph{discovery} una volta trascorso un determinato
 intervallo di tempo. Nell'ultimo caso passerà direttamente allo stato
 \texttt{SLAVE}.
 
-Un esempio di interazione fra i veicoli secondo il protocollo \emph{discovery} è mostrato in \Cref{fig:disc_ex}.
+Un esempio di interazione fra i veicoli secondo il protocollo \emph{discovery} è
+mostrato in \Cref{fig:disc_ex}.
 
 \begin{figure}
 \centering
@@ -694,21 +695,17 @@ Un esempio di interazione fra i veicoli secondo il protocollo \emph{discovery} �
     \node[below of=env, node distance=5cm] (env_ground) {};
     \node[below of=vb, node distance=5cm] (vb_ground) {};
     \node[below of=vc, node distance=5cm] (vc_ground) {};
-
     %
     \draw (va) -- (va_ground);
     \draw (env) -- (env_ground);
     \draw (vb) -- (vb_ground);
     \draw (vc) -- (vc_ground);
     %
-    
     \draw[->] ($(va)!0.2!(va_ground)$) -- node[above,scale=1,midway]{\texttt{broadcast\_disc}} ($(env)!0.2!(env_ground)$);
     \draw[->] ($(env)!0.35!(env_ground)$) -- node[above,scale=1,midway, xshift=1.3cm]{\texttt{disc}} ($(vb)!0.35!(vb_ground)$);
     \draw[->] ($(env)!0.45!(env_ground)$) -- node[above,scale=1,midway, xshift=3.1cm]{\texttt{disc}} ($(vc)!0.45!(vc_ground)$);
     \draw[->] ($(vb)!0.8!(vb_ground)$) -- node[above,scale=1,midway, xshift=-3cm]{\texttt{hello}} ($(va)!0.8!(va_ground)$);
     \draw[->] ($(vc)!0.6!(vc_ground)$) -- node[above,scale=1,midway, xshift=-4.8cm]{\texttt{hello}} ($(va)!0.6!(va_ground)$);
-
-%    \draw[<-] ($(va)!0.35!(va_ground)$) -- node[below,scale=1,midway]{Hey} ($(env)!0.35!(env_ground)$);
   \end{tikzpicture}
   \caption{Esempio protocollo \emph{discovery} con 3 veicoli}
   \label{fig:disc_ex}
@@ -735,18 +732,29 @@ L'algoritmo gestisce elezioni indette simultaneamente da più veicoli e eventual
 fallimenti in fase di elezione.
 
 \subsection{Algoritmo Maximal Indipendent Set}
-Una volta conclusa la fase di elezione il leader riceve una serie di messaggi \texttt{conflict} da parte degli slave, contenenti identità e priorità del mittente e una lista dei veicoli con cui il mittente stesso è in conflitto.
-A questo punto il leader ha le informazioni necessarie per calcolare un insieme di macchine le cui rotte non sono in conflitto. 
+Una volta conclusa la fase di elezione il leader riceve una serie di messaggi
+\texttt{conflict} da parte degli slave, contenenti identità e priorità del
+mittente e una lista dei veicoli con cui il mittente stesso è in conflitto. A
+questo punto il leader ha le informazioni necessarie per calcolare un insieme di
+macchine le cui rotte non sono in conflitto.
 
-Costruendo un grafo dei conflitti, i cui nodi corrispondono ai veicoli e i cui archi rappresentano un conflitto nelle rotte, è sufficiente trovare un insieme indipendente di vertici per scegliere dei veicoli in grado di occupare l'incrocio in sicurezza.
+Costruendo un grafo dei conflitti, i cui nodi corrispondono ai veicoli e i cui
+archi rappresentano un conflitto nelle rotte, è sufficiente trovare un insieme
+indipendente di vertici per scegliere dei veicoli in grado di occupare
+l'incrocio in sicurezza.
 
-Un insieme indipendente $I$ in un grafo $G=(V,E)$ è un insieme di vertici tali che presi a due a due non sono adiacenti, ovvero
+Un insieme indipendente $I$ in un grafo $G=(V,E)$ è un insieme di vertici tali
+che presi a due a due non sono adiacenti, ovvero
 \[\forall u,v \in V \, \, (u, v \in I \implies \{u,v\} \not\in E).\]
 
-Al fine di massimizzare l'utilizzo della risorsa (incrocio) si vorrebbe trovare l'insieme massimo di vertici indipendenti, tuttavia, oltre ad essere un problema NP-Completo, non è compatibile con il requisito di \emph{fairness}.
-Si è quindi deciso di optare per un algoritmo che si limiti a calcolare un insieme massimale $I$, ma che tenga conto del tempo di attesa dei veicoli.
-Il leader invia quindi il messaggio \texttt{green} ai veicoli in $I$ e il messaggio \texttt{red} ai restanti.
-Di seguito la descrizione dell'algoritmo in pseudo-codice:
+Al fine di massimizzare l'utilizzo della risorsa (l'incrocio) si vorrebbe
+trovare l'insieme massimo di vertici indipendenti, tuttavia, oltre ad essere un
+problema NP-Completo, non è compatibile con il requisito di \emph{fairness}. Si
+è quindi deciso di optare per un algoritmo che si limiti a calcolare un insieme
+massimale $I$, ma che tenga conto del tempo di attesa dei veicoli. Il leader
+invia quindi il messaggio \texttt{green} ai veicoli in $I$ e il messaggio
+\texttt{red} ai restanti. Di seguito la descrizione dell'algoritmo in
+pseudo-codice:
 
 \begin{algorithm}
 \SetKwFunction{Sort}{sort\_by\_priority}
