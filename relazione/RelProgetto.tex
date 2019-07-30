@@ -5,6 +5,9 @@
 \usepackage[italian]{cleveref}
 \usepackage{tikz}
 \usetikzlibrary{automata,positioning,topaths,calc, arrows}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage[italiano,ruled, linesnumbered]{algorithm2e}
 
 \title{Implementazione di un sistema di incrocio stradale intelligente \\ for the Project of Distributed Systems}
 
@@ -616,8 +619,13 @@ Si riportano di seguito i messaggi che è possibile inviare all'interfaccia graf
   al veicolo.
 \end{itemize}
 
-
-
+L'interfaccia grafica fornisce le seguenti funzionalità:
+\begin{itemize}
+\item Inserire un nuovo veicolo con una rotta casuale
+\item Mantenere incrocio carico di veicoli inserendone di nuovi periodicamente
+\item Poter impostare una probabilità di guasto (fisico o logico) per i nuovi veicoli
+\item Inserire un nuovo veicolo ad alta priorità...
+\end{itemize}
 
 \section{Protocolli e algoritmi}
 \label{sec:protalg}
@@ -725,6 +733,37 @@ tutti i veicoli con identificativo minore.
 
 L'algoritmo gestisce elezioni indette simultaneamente da più veicoli e eventuali
 fallimenti in fase di elezione.
+
+\subsection{Algoritmo Maximal Indipendent Set}
+Una volta conclusa la fase di elezione il leader riceve una serie di messaggi \texttt{conflict} da parte degli slave, contenenti identità e priorità del mittente e una lista dei veicoli con cui il mittente stesso è in conflitto.
+A questo punto il leader ha le informazioni necessarie per calcolare un insieme di macchine le cui rotte non sono in conflitto. 
+
+Costruendo un grafo dei conflitti, i cui nodi corrispondono ai veicoli e i cui archi rappresentano un conflitto nelle rotte, è sufficiente trovare un insieme indipendente di vertici per scegliere dei veicoli in grado di occupare l'incrocio in sicurezza.
+
+Un insieme indipendente $I$ in un grafo $G=(V,E)$ è un insieme di vertici tali che presi a due a due non sono adiacenti, ovvero
+\[\forall u,v \in V \, \, (u, v \in I \implies \{u,v\} \not\in E).\]
+
+Al fine di massimizzare l'utilizzo della risorsa (incrocio) si vorrebbe trovare l'insieme massimo di vertici indipendenti, tuttavia, oltre ad essere un problema NP-Completo, non è compatibile con il requisito di \emph{fairness}.
+Si è quindi deciso di optare per un algoritmo che si limiti a calcolare un insieme massimale $I$, ma che tenga conto del tempo di attesa dei veicoli.
+Il leader invia quindi il messaggio \texttt{green} ai veicoli in $I$ e il messaggio \texttt{red} ai restanti.
+Di seguito la descrizione dell'algoritmo in pseudo-codice:
+
+\begin{algorithm}
+\SetKwFunction{Sort}{sort\_by\_priority}
+\SetKwFunction{Pop}{pop}
+
+\SetAlgoLined
+\KwIn{Grafo dei conflitti $G=(V,E)$}
+\KwResult{Maximal Indipendent Set $I$}
+$I$ $\leftarrow$ $\emptyset$\;
+\While{$V$ not empty}{
+Choose $v \in V$ with the highest priority\;
+Add $v$ to set $I$\;
+Remove from $V$ the node $v$ and all its neighbours\;
+}
+\KwRet{I}\;
+\caption{Maximal indipendent set}
+\end{algorithm}
 
 \newpage
 This chapter is devoted to the description of the general architectures, and specific algorithms.
