@@ -673,6 +673,23 @@ il veicolo ritenterà il \emph{discovery} una volta trascorso un determinato
 intervallo di tempo. Nell'ultimo caso passerà direttamente allo stato
 \texttt{SLAVE}.
 
+\subsection{Algoritmo Bully}
+L'algoritmo \emph{bully} è utilizzato per eleggere un leader dell'incrocio e
+prevede i seguenti messaggi:
+\begin{itemize}
+\item \texttt{elect}: messaggi utilizzato per indire un'elezione.
+\item \texttt{ans}: messaggio inviato in risposta a un messaggio \texttt{elect}.
+\item \texttt{coord}: messaggio utilizzato per annunciare l'identità del leader.
+\end{itemize}
+
+Un veicolo indice un elezione inviando il messaggio \texttt{elect} ai veicoli
+con identificativo maggiore del proprio. Se non vi sono veicoli con
+identificativo maggiore o se questi non rispondono \texttt{ans} entro un tempo
+prestabilito, il veicolo in questione si elegge leader e invia \texttt{coord} a
+tutti i veicoli con identificativo minore.
+
+L'algoritmo gestisce elezioni indette simultaneamente da più veicoli e eventuali
+fallimenti in fase di elezione.
 
 \newpage
 This chapter is devoted to the description of the general architectures, and specific algorithms.
