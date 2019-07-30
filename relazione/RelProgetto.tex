@@ -2,11 +2,11 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage[english,italian]{babel}
-\usepackage[italian]{cleveref}
 \usepackage{tikz}
-\usetikzlibrary{automata,positioning,topaths,calc, arrows}
+\usetikzlibrary{automata,positioning,topaths,calc, arrows.meta}
 \usepackage{amssymb}
 \usepackage{amsmath}
+\usepackage[italian]{cleveref}
 \usepackage[italiano,ruled, linesnumbered]{algorithm2e}
 
 \title{Implementazione di un sistema di incrocio stradale intelligente \\ for the Project of Distributed Systems}
@@ -686,7 +686,7 @@ mostrato in \Cref{fig:disc_ex}.
 
 \begin{figure}
 \centering
-  \begin{tikzpicture}[node distance=1.8cm,auto,>=stealth']
+  \begin{tikzpicture}[node distance=1.8cm]%,auto,>=stealth']
     \node[shape=rectangle] (va) {\texttt{Vehicle A}};
     \node[right = of va] (env) {\texttt{Environment}};
     \node[right = of env] (vb) {\texttt{Vehicle B}};
@@ -772,6 +772,60 @@ Remove from $V$ the node $v$ and all its neighbours\;
 \KwRet{I}\;
 \caption{Maximal indipendent set}
 \end{algorithm}
+
+\subsection{Diagrammi di sequenza significativi}
+
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[node distance=3cm,
+  font=\footnotesize\ttfamily\normalsize]
+    \node[shape=rectangle] (va) {Vehicle};
+    \node[right = of va] (env) {Environment};
+    \node[below of=va, node distance=5cm] (va_ground) {};
+    \node[below of=env, node distance=5cm] (env_ground) {};
+    \coordinate (Test) at ($(va)!0.57!(va_ground)$);
+    %
+    \draw (va) -- (va_ground);
+    \draw (env) -- (env_ground);
+    \draw (Test) node[fill=white] {[pos\_free]};
+    %
+    \draw[-{Latex}] ($(va)!0.3!(va_ground)$) -- node[above,scale=1,midway, xshift=0.3cm]{req\_prox\_sensor\_data} ($(env)!0.3!(env_ground)$);
+    \draw[->,dashed] ($(env)!0.45!(env_ground)$) -- node[above,scale=1,midway, xshift=-0.3cm]{pos\_free(true/false)} ($(va)!0.45!(va_ground)$);
+    \draw[-{Latex}] ($(va)!0.7!(va_ground)$) -- node[above,scale=1,midway,xshift=1cm]{notify\_move} ($(env)!0.7!(env_ground)$);
+    \draw[->,dashed] ($(env)!0.8!(env_ground)$) -- node[above,scale=1,midway,xshift=-1.6cm]{ack} ($(va)!0.8!(va_ground)$);
+  \end{tikzpicture}
+  \caption{Richiesta movimento da parte di un veicolo.}
+  \label{fig:disc_ex}
+\end{figure}
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[node distance=3cm,%>=stealth',
+  font=\footnotesize\ttfamily\normalsize]
+    \node[shape=rectangle] (va) {Vehicle A};
+    \node[right = of va] (env) {Environment};
+    \node[right = of env] (vb) {Vehicle B};
+    \node[below of=va, node distance=4cm] (va_ground) {};
+    \node[below of=env, node distance=4cm] (env_ground) {};
+    \node[below of=vb, node distance=4cm] (vb_ground) {};
+    \coordinate (Start) at ($(env)!0.5!(env_ground)$);
+    \coordinate (End) at ($(env)!0.8!(env_ground)$);
+    %
+    \draw (va) -- (va_ground);
+    \draw (env) -- (env_ground);
+    \draw (vb) -- (vb_ground);
+    %
+    \draw[->] ($(va)!0.3!(va_ground)$) -- node[above,scale=1,midway, xshift=0.3cm]{request\_towtruck(pos)} ($(env)!0.3!(env_ground)$);
+    \draw[-{Latex}] ($(env)!0.5!(env_ground)$) -- node[above,scale=1,midway, xshift=1.1cm]{is\_stalled} ($(vb)!0.5!(vb_ground)$);
+    \draw[->,dashed] ($(vb)!0.7!(vb_ground)$) -- node[above,scale=1,midway,xshift=-1.5cm] {yes/no} ($(env)!0.7!(env_ground)$);
+    \draw[->,dashed] (Start) -- ++(-0.5,0) |- node[xshift=-0.8cm,yshift=0.7cm] {timeout} (End);
+  \end{tikzpicture}
+  \caption{Richiesta intervento soccorso stradale.}
+  \label{fig:disc_ex}
+\end{figure}
+
+% TODO: elezione seguita da messaggi conflict e green/red
 
 \newpage
 This chapter is devoted to the description of the general architectures, and specific algorithms.
