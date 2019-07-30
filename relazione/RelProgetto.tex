@@ -621,30 +621,46 @@ Si riportano di seguito i messaggi che è possibile inviare all'interfaccia graf
 
 \section{Protocolli e algoritmi}
 \label{sec:protalg}
-\subsection{Protocollo Discovery}
-Il protocollo \emph{discovery} è utilizzato da un veicolo in prossimità dell'incrocio per annunciare la propria presenza e conoscere gli altri veicoli interessati ad impegnare lo stesso.
 
-I messaggi utilizzati nel protocollo sono i seguenti:
+Si assume che lo scambio di messaggi tra i veicoli sia affidabile.
+
+\subsection{Protocollo Discovery}
+Il protocollo \emph{discovery} è utilizzato da un veicolo in prossimità
+dell'incrocio per annunciare la propria presenza e conoscere gli altri veicoli
+interessati ad impegnare lo stesso. Il protocollo prevede i seguenti messaggi,
+tutti gestiti in maniera asincrona:
+
 \begin{itemize}
-\item \texttt{disc}: questo messaggio viene inviato in broadcast. Il payload deve contenere l'identità del veicolo mittente e la sua rotta.
-\item \texttt{hello}: messaggio unicast inviato in risposta ad un disc dai soli veicoli in stato \texttt{DISCOVER}. Il payload deve contenere l'identità del veicolo mittente e la sua rotta.
-\item \texttt{wait}: messaggio unicast inviato in risposta ad un disc dai veicoli in stato \texttt{ELECTION} \texttt{MASTER} \texttt{SLAVE} \texttt{CROSSING}. Il payload non contiene alcuna informazione.
+\item \texttt{disc}: messaggio inviato in broadcast. Il payload deve contenere
+  l'identità del veicolo mittente e la sua rotta.
+\item \texttt{hello}: messaggio unicast inviato in risposta ad un \texttt{disc}
+  dai soli veicoli in stato \texttt{DISCOVER}. Il payload deve contenere
+  l'identità del veicolo mittente e la sua rotta.
+\item \texttt{wait}: messaggio unicast inviato in risposta ad un \texttt{disc}
+  dai veicoli in stato \texttt{ELECTION}, \texttt{MASTER}, \texttt{SLAVE} o
+  \texttt{CROSSING}. Il payload non contiene alcuna informazione.
 \end{itemize} 
 
-Un veicolo non appena entra nello stato \texttt{DISCOVER} invia un messaggio disc in broadcast a tutti i veicoli nelle vicinanze.
+Un veicolo non appena entra nello stato \texttt{DISCOVER} invia un messaggio
+\texttt{disc} in broadcast a tutti i veicoli nelle vicinanze, i quali:
 \begin{itemize}
-\item I veicoli nello stato INQUEUE ignorano il messaggio. 
-\item I veicoli in stato DISCOVER si salvano il mittente nella lista dei vicini e inviano un messaggio di hello come risposta, per segnalare la loro presenza in prossimità dell'incrocio.
-\item I veicoli in stato ELECTION MASTER SLAVE CROSSING inviano come risposta un messaggio wait in modo da segnalare al mittente di aspettare perchè l'incrocio è già impegnato.
+\item Nello stato \texttt{INQUEUE} ignorano il messaggio.
+\item Nello stato \texttt{DISCOVER} salvano il mittente nella lista dei vicini e
+  rispondono con \texttt{hello} per segnalare la loro presenza al mittente.
+\item Negli stati \texttt{ELECTION}, \texttt{MASTER}, \texttt{SLAVE} e
+  \texttt{CROSSING} inviano come risposta un messaggio \texttt{wait}, segnalando
+  al mittente che l'incrocio è già impegnato.
 \end{itemize}
 
-Il veicolo che ha inviato il messaggio disc può quindi ricevere:
+Il veicolo che ha inviato il messaggio \texttt{disc} può quindi ricevere:
 \begin{itemize}
-\item messaggi di \texttt{hello}: in questo caso si salva il riferimento del veicolo mittente tra i suoi vicini
-\item messaggio \texttt{wait}: in questo caso il veicolo passa allo stato wait
+\item messaggio \texttt{hello}: in questo caso salva il riferimento del veicolo
+  mittente tra i suoi vicini.
+\item messaggio \texttt{wait}: in questo caso entra nello stato \texttt{WAIT}.
 \end{itemize}
 
-La fase di discovery si considera conclusa al verificarsi dei seguenti eventi:
+La fase di discovery si considera conclusa al verificarsi di uno dei seguenti
+eventi:
 \begin{itemize}
 \item timeout \texttt{disc\_tm}
 \item ricezione messaggio \texttt{elect}
@@ -652,9 +668,10 @@ La fase di discovery si considera conclusa al verificarsi dei seguenti eventi:
 \item ricezione messaggio \texttt{coord}
 \end{itemize}
 
-Nei primi due casi il veicolo entrerà nello stato \texttt{ELECT}.
-Nel terzo caso il veicolo ritenterà il \emph{discovery} una volta trascorso un determinato intervallo di tempo.
-Nell'ultimo caso passerà direttamente nello stato \texttt{SLAVE}.
+Nei primi due casi il veicolo entrerà nello stato \texttt{ELECT}. Nel terzo caso
+il veicolo ritenterà il \emph{discovery} una volta trascorso un determinato
+intervallo di tempo. Nell'ultimo caso passerà direttamente allo stato
+\texttt{SLAVE}.
 
 
 \newpage
