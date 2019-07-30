@@ -4,7 +4,7 @@
 \usepackage[english,italian]{babel}
 \usepackage[italian]{cleveref}
 \usepackage{tikz}
-\usetikzlibrary{automata,positioning,topaths}
+\usetikzlibrary{automata,positioning,topaths,calc, arrows}
 
 \title{Implementazione di un sistema di incrocio stradale intelligente \\ for the Project of Distributed Systems}
 
@@ -672,6 +672,41 @@ Nei primi due casi il veicolo entrerà nello stato \texttt{ELECT}. Nel terzo cas
 il veicolo ritenterà il \emph{discovery} una volta trascorso un determinato
 intervallo di tempo. Nell'ultimo caso passerà direttamente allo stato
 \texttt{SLAVE}.
+
+Un esempio di interazione fra i veicoli secondo il protocollo \emph{discovery} è mostrato in \Cref{fig:disc_ex}.
+
+\begin{figure}
+\centering
+  \begin{tikzpicture}[node distance=1.8cm,auto,>=stealth']
+    \node[shape=rectangle] (va) {\texttt{Vehicle A}};
+    \node[right = of va] (env) {\texttt{Environment}};
+    \node[right = of env] (vb) {\texttt{Vehicle B}};
+    \node[right = of vb] (vc) {\texttt{Vehicle C}};
+    \node[below of=va, node distance=5cm] (va_ground) {};
+    \node[below of=env, node distance=5cm] (env_ground) {};
+    \node[below of=vb, node distance=5cm] (vb_ground) {};
+    \node[below of=vc, node distance=5cm] (vc_ground) {};
+
+    %
+    \draw (va) -- (va_ground);
+    \draw (env) -- (env_ground);
+    \draw (vb) -- (vb_ground);
+    \draw (vc) -- (vc_ground);
+    %
+    
+    \draw[->] ($(va)!0.2!(va_ground)$) -- node[above,scale=1,midway]{\texttt{broadcast\_disc}} ($(env)!0.2!(env_ground)$);
+    \draw[->] ($(env)!0.35!(env_ground)$) -- node[above,scale=1,midway, xshift=1.3cm]{\texttt{disc}} ($(vb)!0.35!(vb_ground)$);
+    \draw[->] ($(env)!0.45!(env_ground)$) -- node[above,scale=1,midway, xshift=3.1cm]{\texttt{disc}} ($(vc)!0.45!(vc_ground)$);
+    \draw[->] ($(vb)!0.8!(vb_ground)$) -- node[above,scale=1,midway, xshift=-3cm]{\texttt{hello}} ($(va)!0.8!(va_ground)$);
+    \draw[->] ($(vc)!0.6!(vc_ground)$) -- node[above,scale=1,midway, xshift=-4.8cm]{\texttt{hello}} ($(va)!0.6!(va_ground)$);
+
+%    \draw[<-] ($(va)!0.35!(va_ground)$) -- node[below,scale=1,midway]{Hey} ($(env)!0.35!(env_ground)$);
+  \end{tikzpicture}
+  \caption{Esempio protocollo \emph{discovery} con 3 veicoli}
+  \label{fig:disc_ex}
+\end{figure}
+
+
 
 \subsection{Algoritmo Bully}
 L'algoritmo \emph{bully} è utilizzato per eleggere un leader dell'incrocio e
