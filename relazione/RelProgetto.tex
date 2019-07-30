@@ -566,6 +566,58 @@ dall'evento \texttt{ph\_fault} che obbliga il veicolo ad entrare nello stato
 \texttt{PH-FAULT}.
 
 
+\subsection{Environment}
+
+Si riportano di seguito le API pubbliche dell'ambiente che è possibile
+richiamare dall'esterno:
+\begin{itemize}
+\item \texttt{broadcast\_disc}: funzione richiamata da un veicolo per simulare
+  un messaggio broadcast. La funzione calcola le auto che si trovano a portata
+  wireless del veicolo e quindi inoltra il messaggio.
+\item \texttt{req\_prox\_sensor\_data}: funzione utilizzata dal veicolo per
+  simulare una query al sensore di prossimità. La funzione verificare se sia
+  presente o meno un veicolo nella posizione richiesta, quindi inoltra l'esito
+  al veicolo. Nota: non viene controllato lo stato del veicolo che potrebbe
+  essere quindi anche in guasto fisico o logico.
+\item \texttt{notify\_move}: funzione utilizzata dal veicolo per avvisare
+  l'ambiente che si è mosso. La funzione provvede ad aggiornare lo stato globale
+  dell’incrocio. Una volta concluse tutte le operazioni viene inviato il nuovo
+  stato globale all’interfaccia grafica.
+\item \texttt{spawn\_car}: funzione utilizzata per inserire un nuovo veicolo
+  nella simulazione. Viene utilizzata principalmente dall'interfaccia grafica.
+  Una volta concluse tutte le operazioni viene inviato il nuovo stato globale
+  all’interfaccia grafica.
+\item \texttt{delete\_car}: la funzione cancella un veicolo dall'ambiente. Viene
+  utilizzata dal carro attrezzi in caso di veicoli guasti oppure dal veicolo
+  stesso una volta che raggiunge la sua destinazione nell’ambiente. Una volta
+  concluse tutte le operazioni viene inviato il nuovo stato globale
+  all’interfaccia grafica.
+\item \texttt{request\_towtruck}: funzione utilizzata dai veicoli per richiedere
+  l'intervento del carro attrezzi. La funzione verifica se il veicolo segnalato
+  sia effettivamente guasto, e in caso positivo provvede a rimuoverlo
+  dall’ambiente. I guasti logici vengono rilevati mediante un timeout: se il
+  veicolo non risponde alla richiesta entro un determinato intervallo di tempo
+  viene considerato in guasto logico. Una volta concluse tutte le operazioni
+  viene inviato il nuovo stato globale all’interfaccia grafica.
+\end{itemize}
+
+\subsection{Interfaccia grafica}
+
+Si riportano di seguito i messaggi che è possibile inviare all'interfaccia grafica:
+\begin{itemize}
+\item \texttt{globalstate}: Alla ricezione di questo messaggio l’interfaccia
+  grafica procede aggiornando la visualizzazione dell’incrocio secondo il nuovo
+  stato ricevuto.
+\item \texttt{cardata}: Viene invocata dal veicolo quando entra in un nuovo
+  stato così da mostrare l'evento anche dall'interfaccia grafica.
+\item \texttt{carcolor}: Viene invocata dal veicolo quando questo riceve un
+  messaggio \texttt{green}/\texttt{red} oppure entra in \texttt{PH-FAULT}. Alla
+  ricezione di tale messaggio l’interfaccia va a modificare il colore associato
+  al veicolo.
+\end{itemize}
+
+
+
 \newpage
 This chapter is devoted to the description of the general architectures, and specific algorithms.
 
