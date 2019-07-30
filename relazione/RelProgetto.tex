@@ -825,8 +825,57 @@ Remove from $V$ the node $v$ and all its neighbours\;
   \label{fig:disc_ex}
 \end{figure}
 
+\begin{figure}
+\centering
+\begin{tikzpicture}[node distance=2cm,%>=stealth',
+  font=\footnotesize\ttfamily\normalsize]
+    \node[shape=rectangle] (va) {Vehicle A};
+    \node[right = of va] (vb) {Vehicle B};
+    \node[right = of vb] (vc) {Vehicle C};
+    \node[right = of vc] (vd) {Vehicle D};
+    \node[below of=va, node distance=10cm] (va_ground) {};
+    \node[below of=vb, node distance=10cm] (vb_ground) {};
+    \node[below of=vc, node distance=10cm] (vc_ground) {};
+    \node[below of=vd, node distance=10cm] (vd_ground) {};
+    \coordinate (Start) at ($(vd)!0.92!(vd_ground)$);
+    \coordinate (End) at ($(vd)!0.97!(vd_ground)$);
+    %
+    \draw (va) -- (va_ground);
+    \draw (vb) -- (vb_ground);
+    \draw (vc) -- (vc_ground);
+    \draw (vd) -- (vd_ground);
+    %
+    \draw[-{Latex}] ($(vb)!0.1!(vb_ground)$) -- node[above,scale=1,midway, xshift=1.3cm]{elect} ($(vc)!0.1!(vc_ground)$);
+    \draw[->, dashed] ($(vc)!0.2!(vc_ground)$) -- node[above,scale=1,midway, xshift=-1.3cm]{ans} ($(vb)!0.2!(vb_ground)$);
+
+    \draw[-{Latex}] ($(vb)!0.3!(vb_ground)$) -- node[above,scale=1,midway, xshift=3.2cm]{elect} ($(vd)!0.3!(vd_ground)$);
+    \draw[->, dashed] ($(vd)!0.35!(vd_ground)$) -- node[above,scale=1,midway, xshift=-3.2cm]{ans} ($(vb)!0.35!(vb_ground)$);
+
+    \draw[-{Latex}] ($(vc)!0.15!(vc_ground)$) -- node[above,scale=1,midway, xshift=1.3cm]{elect} ($(vd)!0.15!(vd_ground)$);
+    \draw[->, dashed] ($(vd)!0.25!(vd_ground)$) -- node[above,scale=1,midway, xshift=-1.3cm]{ans} ($(vc)!0.25!(vc_ground)$);
+
+    \draw[->] ($(vd)!0.4!(vd_ground)$) -- node[above,scale=1,midway, xshift=-1.2cm]{coord} ($(vc)!0.4!(vc_ground)$);
+    \draw[->] ($(vd)!0.45!(vd_ground)$) -- node[above,scale=1,midway, xshift=-3.2cm]{coord} ($(vb)!0.45!(vb_ground)$);
+    \draw[->] ($(vd)!0.5!(vd_ground)$) -- node[above,scale=1,midway, xshift=-5.2cm]{coord} ($(va)!0.5!(va_ground)$);
+
+    \draw[->] ($(va)!0.6!(va_ground)$) -- node[above,scale=1,midway, xshift=4.9cm]{conflict} ($(vd)!0.6!(vd_ground)$);
+    \draw[->] ($(vb)!0.65!(vb_ground)$) -- node[above,scale=1,midway, xshift=2.95cm]{conflict} ($(vd)!0.65!(vd_ground)$);
+    \draw[->] ($(vc)!0.7!(vc_ground)$) -- node[above,scale=1,midway, xshift=1cm]{conflict} ($(vd)!0.7!(vd_ground)$);
+
+    \draw[->] ($(vd)!0.8!(vd_ground)$) -- node[above,scale=1,midway, xshift=-1.2cm]{green} ($(vc)!0.8!(vc_ground)$);
+    \draw[->] ($(vd)!0.85!(vd_ground)$) -- node[above,scale=1,midway, xshift=-3.2cm]{red} ($(vb)!0.85!(vb_ground)$);
+    \draw[->] ($(vd)!0.9!(vd_ground)$) -- node[above,scale=1,midway, xshift=-5.2cm]{green} ($(va)!0.9!(va_ground)$);
+    \draw[->] (Start) -- ++(-0.5,0) |- node[xshift=-0.4cm, yshift=0.25cm] {red} (End);
+
+
+  \end{tikzpicture}
+  \caption{Elezione e coordinamento.}
+  \label{fig:disc_ex}
+\end{figure}
+
 % TODO: elezione seguita da messaggi conflict e green/red
 
+\newpage
 \newpage
 This chapter is devoted to the description of the general architectures, and specific algorithms.
 
