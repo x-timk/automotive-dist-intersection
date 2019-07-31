@@ -3,7 +3,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage[english,italian]{babel}
 \usepackage{tikz}
-\usetikzlibrary{automata,positioning,topaths,calc, arrows.meta}
+\usetikzlibrary{automata,positioning,topaths,calc,arrows.meta,shapes.geometric}
 \usepackage{amssymb}
 \usepackage{amsmath}
 \usepackage[italian]{cleveref}
@@ -880,24 +880,69 @@ sequenza di alcune delle iterazioni tra i moduli descritte nella
 
 \section{Architettura fisica e deployment}
 
-\newpage
-This chapter is devoted to the description of the general architectures, and specific algorithms.
+Ogni veicolo dispone di un computer di bordo dove viene eseguito il modulo
+\emph{Vehicle}. Ai fini della simulazione, i veicoli sono in relazione
+client-server con il modulo \emph{Environment}, che può essere eseguito su un
+computer separato. Veicoli ed environment comunicano con il modulo
+dell'interfaccia grafica per mantenere aggiornata la visualizzazione. In
+\Cref{fig:arcfis} si mostra uno scenario in cui i veicoli A, B, C e D si trovano
+in prossimità dell'incrocio e formano una rete mesh, mentre i veicoli E e F
+comunicano solo con l'environment. 
 
-\section{Logical architecture}
-Describe the components of your systems: modules/objects/components/services.
-For each component, describe the functionalities it implements, and by who is used.
-
-
-\section{Protocols and algorithms}
-Communication between components.  UML sequence diagrams go here.
-
-Also, put here a detailed description of distributed algorithms used to solve specific problems of the project.
-
-\section{Physical architecture and deployment}
-Which nodes and platforms involved, and where each component is deployed.
-
-\section{Development plan}
-Since it is difficult to predict just how hard implementing a new system will be, you should formulate as a set of ``tiers,'' where the basic tier is something you?re sure you can complete, and the additional tiers add more features, at both the application and the system level.
+\tikzset{
+  quadratoe/.style={shape=rectangle,draw,minimum size=2cm,fill=blue!20},
+  quadratov/.style={shape=rectangle,draw,minimum size=1.5cm,fill=blue!20},
+  cerchioe/.style={circle,draw,minimum size=1.8cm,fill=white},
+  cerchiov/.style={circle,draw,minimum size=1.4cm,fill=white}
+}
+\begin{figure}
+  \centering
+  \begin{tikzpicture}
+    \coordinate (E) at (-11,5);
+    \coordinate (F) at (-9,5);
+    \coordinate (A) at (-6,5);
+    \coordinate (B) at (-4,5);
+    \coordinate (C) at (-2,5);
+    \coordinate (D) at (0,5);
+    \coordinate (Env) at (-5,0);
+    \coordinate (Gui) at (-1,0);
+    % \node[rectangle,draw,minimum size=2cm] at (A) {};
+    \node[quadratoe] at (Env)  {};
+    \node[cerchioe] at (Env) {Env};
+    \node[quadratoe] at (Gui)  {};
+    \node[cerchioe] at (Gui) {GUI};
+    \node[quadratov,label=A] at (A)  {};
+    \node[cerchiov] at (A)  {Vehicle};
+    \node[quadratov,label=B] at (B)  {};
+    \node[cerchiov] at (B)  {Vehicle};
+    \node[quadratov,label=C] at (C)  {};
+    \node[cerchiov] at (C)  {Vehicle};
+    \node[quadratov,label=D] at (D)  {};
+    \node[cerchiov] at (D)  {Vehicle};
+    \node[quadratov,label=E] at (E)  {};
+    \node[cerchiov] at (E)  {Vehicle};
+    \node[quadratov,label=F] at (F)  {};
+    \node[cerchiov] at (F)  {Vehicle};
+    \draw[-{Latex},shorten >=0.9cm, shorten <=0.7cm,draw=purple!70,dashed] (A) -- (Gui);
+    \draw[-{Latex},shorten >=0.9cm, shorten <=0.7cm,draw=purple!70,dashed] (B) -- (Gui);
+    \draw[-{Latex},shorten >=0.9cm, shorten <=0.7cm,draw=purple!70,dashed] (C) -- (Gui);
+    \draw[-{Latex},shorten >=0.9cm, shorten <=0.7cm,draw=purple!70,dashed] (D) -- (Gui);
+    \draw[-{Latex},shorten >=0.9cm, shorten <=0.7cm,draw=purple!70,dashed] (E) -- (Gui);
+    \draw[-{Latex},shorten >=0.9cm, shorten <=0.7cm,draw=purple!70,dashed] (F) -- (Gui);
+    \draw[{Latex}-{Latex},shorten >=0.7cm, shorten <=0.7cm] (A) -- (B);
+    \draw[{Latex}-{Latex},shorten >=0.7cm, shorten <=0.7cm] (B) -- (C);
+    \draw[{Latex}-{Latex},shorten >=0.7cm, shorten <=0.7cm] (C) -- (D);
+    \draw[{Latex}-{Latex},shorten >=0.7cm, shorten <=0.9cm,thick] (Env) -- (A);
+    \draw[{Latex}-{Latex},shorten >=0.7cm, shorten <=0.9cm,thick] (Env) -- (B);
+    \draw[{Latex}-{Latex},shorten >=0.7cm, shorten <=0.9cm,thick] (Env) -- (C);
+    \draw[{Latex}-{Latex},shorten >=0.7cm, shorten <=0.9cm,thick] (Env) -- (D);
+    \draw[{Latex}-{Latex},shorten >=0.7cm, shorten <=0.9cm,thick] (Env) -- (E);
+    \draw[{Latex}-{Latex},shorten >=0.7cm, shorten <=0.9cm,thick] (Env) -- (F);
+    \draw[{Latex}-{Latex},shorten >=0.9cm, shorten <=0.9cm,draw=purple!70,thick,dashed] (Env) -- (Gui);
+  \end{tikzpicture}
+  \caption{Architettura fisica}
+  \label{fig:arcfis}
+\end{figure}
 
 \chapter{Implementation}
 
