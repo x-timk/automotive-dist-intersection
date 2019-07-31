@@ -8,6 +8,8 @@
 \usepackage{amsmath}
 \usepackage[italian]{cleveref}
 \usepackage[italiano,ruled, linesnumbered]{algorithm2e}
+\usepackage{hyperref}
+\usepackage{minted}
 
 \title{Implementazione di un sistema di incrocio stradale intelligente \\ for the Project of Distributed Systems}
 
@@ -945,6 +947,40 @@ comunicano solo con l'environment.
 \end{figure}
 
 \chapter{Implementation}
+I linguaggi scelti per l'implementazione della soluzione sono Erlang (versione Erlang/OTP 22) per i moduli  \emph{Vehicle} ed \emph{Environment}, e Java 1.8 per il modulo dell'interfaccia grafica.
+Per permettere all'interfaccia grafica di interagire con i moduli Erlang è stata utilizzata la libreria \texttt{JInterface} fornita dalla stessa Ericsson.
+I veicoli e l'environment sono processi a se stanti e sono implementati dai moduli erlang \texttt{vehicle} e \texttt{dim\_env}. Per comodità tutti i processi erlang vengono registrati con un nome: in questo modo per inviare messaggi si utilizza il nome registrato invece del pid del processo.
+\subsection{Environment}
+Il processo environment è il primo ad essere avviato, mediante la funzione \texttt{go/0}. All'avvio vengono create e inizializzate le strutture dati necessarie a descrivere lo stato globale dell'incrocio.
+Per rappresentare l'incrocio vengono creati due grafi pesati identici, uno orientato e uno non orientato. I nodi del grafo corrispondono alle celle della griglia in cui è partizionato lo spazio fisico, gli archi invece collegano celle adiacenti. Il peso degli archi viene assegnato in base alla distanza fisica tra le celle.
+Il grafo orientato descrive i sensi di marcia delle corsie, ed è utilizzato per calcolare la rotta di un veicolo come cammino minimo tra nodo di partenza e destinazione.
+Il grafo non orientato è invece utilizzato per salvare la posizione dei veicoli, effettuare query prossimità e per individuare veicoli a portata wireless (necessario ad esempio per simulare un messaggio \texttt{disc} in broadcast).
+Ogni nodo del grafo non orientato contiene le seguenti informazioni:
+\begin{itemize}
+\item Nome: atomo Erlang;
+\item Tipologia di nodo: atomo Erlang usato per distinguere nodi normali, in prossimità di un incrocio, in incrocio, in uscita da incrocio. Può assumere i seguenti 3 valori: \texttt{tail\_node}, \texttt{top\_node}, \texttt{cross\_node}, \texttt{out\_node};
+\item Veicoli presenti nel nodo: lista Erlang contenente gli identificativi dei veicoli.
+\end{itemize}
+I grafi sono stati implementati con la libreria \href{https://github.com/aggelgian/erlang-algorithms}{\texttt{erlang-algorithms}}, 
+che è essenzialmente un wrapper del modulo \texttt{digraph} della libreria standard di Erlang. È stata scelta tale libreria in quanto era già presente un'implementazione dell'algoritmo del cammino minimo (Dijkstra) per grafi pesati.
+Il processo environment è stato implementato utilizzando behaviour erlang \texttt{gen\_server}, e quindi è stato sufficiente implementare le funzioni \texttt{handle\_call} e \texttt{handle\_cast} per gestire rispettivamente messaggi sincroni e asincroni, lasciando al behaviour la gestione del main loop. Per inviare messaggi al processo environment è necessario utilizzare le funzioni \texttt{gen\_server:call} e \texttt{gen\_server:cast} esposte dal behaviour.
+
+Come esempio di gestione di un messaggio asicrono si riporta l'implementazione della richiesta di broadcast da parte di un veicolo. Il veicolo richiama la funzione \texttt{dim\_env:broadcast\_msg}, che si traduce in un messaggio asincrono al processo environment.
+\begin{minted}{erlang}
+broadcast_msg(Msg) ->
+  gen_server:cast(?MODULE, {broadcast, Msg}).
+\end{minted}
+Il messaggio viene poi gestito dalla funzione \texttt{handle\_cast}
+\begin{minted}{erlang}
+handle_cast({broadcast, Msg={FromCar, _Route}}, W) ->
+  Cars = get_car_neighboorhood(W#world.undir, FromCar, ?PROX_RANGE),
+  broadcast_message(Msg, Cars),
+  {noreply, W};
+\end{minted}
+
+%% TODO: implementazione veicolo (parlare di gen statem) e GUI
+\newpage
+
 
 Details about the implementation: every choice about platforms, languages, software/hardware, middlewares, which has not been decided in the requirements.
 
