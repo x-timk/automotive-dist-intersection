@@ -295,6 +295,7 @@ far passare nel seguente modo:
 \chapter{Progetto}
 
 \section{Architettura Logica}
+\label{sec:arclog}
 Le componenti principali della soluzione sono:
 \begin{itemize}
 \item Modulo Veicolo: utilizzato per rappresentare il singolo veicolo;
@@ -775,6 +776,10 @@ Remove from $V$ the node $v$ and all its neighbours\;
 
 \subsection{Diagrammi di sequenza significativi}
 
+Nelle \Cref{fig:car_mv,fig:towtruck,fig:elect} si riportano i diagrammi di
+sequenza di alcune delle iterazioni tra i moduli descritte nella
+\Cref{sec:arclog}.
+
 
 \begin{figure}
 \centering
@@ -796,7 +801,7 @@ Remove from $V$ the node $v$ and all its neighbours\;
     \draw[->,dashed] ($(env)!0.8!(env_ground)$) -- node[above,scale=1,midway,xshift=-1.6cm]{ack} ($(va)!0.8!(va_ground)$);
   \end{tikzpicture}
   \caption{Richiesta movimento da parte di un veicolo.}
-  \label{fig:disc_ex}
+  \label{fig:car_mv}
 \end{figure}
 
 \begin{figure}
@@ -822,10 +827,10 @@ Remove from $V$ the node $v$ and all its neighbours\;
     \draw[->,dashed] (Start) -- ++(-0.5,0) |- node[xshift=-0.8cm,yshift=0.7cm] {timeout} (End);
   \end{tikzpicture}
   \caption{Richiesta intervento soccorso stradale.}
-  \label{fig:disc_ex}
+  \label{fig:towtruck}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[h]
 \centering
 \begin{tikzpicture}[node distance=2cm,%>=stealth',
   font=\footnotesize\ttfamily\normalsize]
@@ -870,12 +875,11 @@ Remove from $V$ the node $v$ and all its neighbours\;
 
   \end{tikzpicture}
   \caption{Elezione e coordinamento.}
-  \label{fig:disc_ex}
+  \label{fig:elect}
 \end{figure}
 
-% TODO: elezione seguita da messaggi conflict e green/red
+\section{Architettura fisica e deployment}
 
-\newpage
 \newpage
 This chapter is devoted to the description of the general architectures, and specific algorithms.
 
