@@ -296,11 +296,13 @@ decorate_vertices_with_type(G, Vertices) ->
             Vertices).
 
 %% Da lista vertici restituisco array con tupla del tipo {nodo, [macchine]}
-get_vertex_cars_array(_, []) ->
-  [];
-get_vertex_cars_array(G, [H|T]) ->
-  {Node, {_, Cars}} = graph:vertex(G, H),
-  [{Node, Cars} | get_vertex_cars_array(G, T)].
+get_vertex_cars_array(G, Vertices) ->
+  lists:map(fun(Node) ->
+                {Node, {_, Cars}} = graph:vertex(G, Node),
+                {Node, Cars}
+            end,
+            Vertices
+           ).
 
 %% Funzione per creare una nuova auto:
 %% Name: atomo che corrispondera' a id registrato, e che viene usato per inviare messaggi all'auto
