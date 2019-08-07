@@ -12,10 +12,12 @@
 -include_lib("stdlib/include/assert.hrl").
 
 -record(world, {
-  dir,
-  undir,
-  jgui = []
-}).
+                dir,
+                undir,
+                shortest_paths,
+                vertex_neighbours,
+                jgui = []
+               }).
 
 %% portata antenna wireless a bordo di ogni auto
 -define(PROX_RANGE, 7).
@@ -33,9 +35,38 @@ print(Format, Args) ->
   io:format("ENV: " ++ Usr ++ "~n").
 
 create_world() ->
+  DirGraph = create_graph(directed),
+  UndirGraph = create_graph(undirected),
+  Vertices = graph:vertices(UndirGraph),
+  AllPairsShortestPath =
+    lists:foldl(
+      fun (Source, Map) ->
+          ShortestPaths = dijkstra:run(DirGraph, Source),
+          lists:foldl(
+            fun ({Dest, Res}, AccMap) ->
+                case Res of
+                  {_Cost, Path} -> maps:put({Source, Dest}, Path, AccMap);
+                  unreachable -> maps:put({Source, Dest}, unreachable, AccMap)
+                end
+            end,
+            Map,
+            ShortestPaths)
+      end,
+      maps:new(),
+      Vertices),
+  VertexNeighbours =
+    maps:fromList(
+      lists:map(
+        fun(Vertex) ->
+            {Vertex, get_neighbourhood(UndirGraph, Vertex, ?PROX_RANGE)}
+        end,
+        Vertices
+       )),
   #world{
-     dir= create_graph(directed),
-     undir= create_graph(undirected)
+     dir=DirGraph,
+     undir=UndirGraph,
+     shortest_paths=AllPairsShortestPath,
+     vertex_neighbours=VertexNeighbours
     }.
 
 
@@ -177,7 +208,7 @@ get_shortest_path(ShortestsPaths, V2) ->
     unreachable -> Res
   end.
 
-get_neighboorhood(G, V, Range) ->
+get_neighbourhood(G, V, Range) ->
   ShortestPaths = dijkstra:run(G, V),
   lists:filtermap(
     fun({Node, Res}) ->
@@ -189,22 +220,30 @@ get_neighboorhood(G, V, Range) ->
   ).
 
 %% Restituisco lista di auto vicine a Car
-get_car_neighboorhood(G, Car, Range) ->
+get_car_neighbourhood(#world{undir=G, vertex_neighbours=VNMap}, Car, Pos, Range) ->
   V = get_car_vertex(G, Car),
-  Neighbour = get_neighboorhood(G, V, Range),
-  Neighbour_vertices = get_vertex_cars_array(G, Neighbour),
+  %% TODO: testare che il risultato di vertex coincida con il risultato di
+  %% get_car_vertex e in caso poisitivo rimuovere la chiamata a get_car_vertex
+  {V, _} = graph:vertex(G, Pos),
+  Neighbourhood = get_neighbourhood(G, V, Range),
+  %% TODO: testare la mappa dei vicini, se funziona rimuovere la chiamata a
+  %% get_neighbourhood
+  Neighbourhood = maps:get(V, VNMap),
+  NeighbourCars =
+    lists:append(
+      lists:map(
+        fun (Node) ->
+            {_, {_Type, Cars}} = graph:vertex(G, Node),
+            Cars
+        end,
+        Neighbourhood)),
+  %% NeighbourhoodVertices = get_vertex_cars_array(G, Neighbourhood),
   %% Cancello me stesso dalla lista dei vicini
-  Res = lists:delete(Car, aux_get_car_neighboorhood(G, Neighbour_vertices)),
+  Res = lists:delete(Car, NeighbourCars),
   Res.
 
-aux_get_car_neighboorhood(_, []) ->
-  [];
-aux_get_car_neighboorhood(G, [H | Neighbour]) ->
-  {_, Cars} = H,
-  lists:append(Cars, aux_get_car_neighboorhood(G, Neighbour)).
-
 is_node_occupied(G, V) ->
-  case graph:get_vertex_label(G, V) of
+  case graph:vertex(G, V) of
     {_, {_, [_ | _]}} -> true;
     {_, {_, []}} -> false;
     false -> false
@@ -212,12 +251,12 @@ is_node_occupied(G, V) ->
 
 %% Aggiungo macchina Car in nodo V del grafo
 add_car_to_vertex(G, V, Car) ->
-  {_, {Type, Cars}} = graph:get_vertex_label(G, V),
+  {_, {Type, Cars}} = graph:vertex(G, V),
   graph:add_vertex(G, V, {Type, [Car | Cars]}).
 
 %% Cancello una macchina Car da nodo V del grafo
 delete_car_from_vertex(G, V, Car) ->
-  {_, {Type, Cars}} = graph:get_vertex_label(G, V),
+  {_, {Type, Cars}} = graph:vertex(G, V),
   %% ?assert(lists:member(Car, Cars), io:format("Trying to remove ~p from ~p~n", [Car, Cars])),
   NewCars = lists:delete(Car, Cars),
   %% tmele: devo modificare il vertice esistente
@@ -237,7 +276,7 @@ get_car_vertex(G, Car) ->
 aux_get_car_vertex(_, [], _) ->
   false;
 aux_get_car_vertex(G, [H|T], Car) ->
-  {_, {_, Cars}} = graph:get_vertex_label(G, H),
+  {_, {_, Cars}} = graph:vertex(G, H),
   case lists:member(Car, Cars) of
     false -> aux_get_car_vertex(G, T, Car);
     true -> H
@@ -245,25 +284,22 @@ aux_get_car_vertex(G, [H|T], Car) ->
 
 %% Scorro lista di auto e mando disc a tutti
 %% Simulo broadcast dall'auto
-broadcast_discover(_, []) ->
-  ok;
-broadcast_discover(FromCar, [H | T]) ->
-  % H ! {disc, FromCar},
-  vehicle:send_disc(H, FromCar),
-  broadcast_discover(FromCar, T).
+broadcast_discover(FromCar, Cars) ->
+  lists:foreach(fun (Car) -> vehicle:send_disc(Car, FromCar) end, Cars).
 
 %% Da lista vertici restituisco array con tupla del tipo {nodo, tipo}
-get_vertex_type_array(_, []) ->
-  [];
-get_vertex_type_array(G, [H|T]) ->
-  {Node, {Type, _}} = graph:get_vertex_label(G, H),
-  [{Node, Type} | get_vertex_type_array(G, T)].
+decorate_vertices_with_type(G, Vertices) ->
+  lists:map(fun(Vertex) ->
+                {Vertex, {Type, _}} = graph:vertex(G, Vertex),
+                {Vertex, Type}
+            end,
+            Vertices).
 
 %% Da lista vertici restituisco array con tupla del tipo {nodo, [macchine]}
 get_vertex_cars_array(_, []) ->
   [];
 get_vertex_cars_array(G, [H|T]) ->
-  {Node, {_, Cars}} = graph:get_vertex_label(G, H),
+  {Node, {_, Cars}} = graph:vertex(G, H),
   [{Node, Cars} | get_vertex_cars_array(G, T)].
 
 %% Funzione per creare una nuova auto:
@@ -273,8 +309,11 @@ get_vertex_cars_array(G, [H|T]) ->
 %% VStop: posizione finale
 %% Speed: velocita' movimento (es: con un valore 2000 l'auto tenta di muoversi ogni 2 secondi)
 add_car_to_graph(W, Name, Desc, VStart, Vstop, Speed, Prio, FaultProb) ->
+  %% TODO: testare la mappa dei shortest path, se funziona canellare le chiamate
+  %% a get_min_path
   Path = get_min_path(W#world.dir, VStart, Vstop),
-  {Res, _Ot} = vehicle:start_link({?MODULE, Name, Desc, get_vertex_type_array(W#world.dir, Path), Speed, Prio, FaultProb, W#world.jgui}),
+  Path = maps:get({VStart, Vstop}, W#world.shortest_paths),
+  {Res, _Ot} = vehicle:start_link({?MODULE, Name, Desc, decorate_vertices_with_type(W#world.dir, Path), Speed, Prio, FaultProb, W#world.jgui}),
   case Res of
     ok -> add_car_to_vertex(W#world.undir, VStart, Name);
     _Other -> ko
@@ -314,6 +353,7 @@ spawn_car(CarName, CarDesc, StartPos, EndPos, Speed, Prio, FaultProb) ->
     _:_ -> {error, timeout}
   end.
 
+
 add_jgui_endpoint(Mbox, Node) ->
   gen_server:call(?MODULE, {addjgui, Mbox, Node}).
 
@@ -337,12 +377,12 @@ notify_move(CarName, CurrentPos, NextPos) ->
 
 
 
-handle_cast({disc, Msg={FromCar, _Route}},W) ->
-  Cars = get_car_neighboorhood(W#world.undir, FromCar, ?PROX_RANGE),
+handle_cast({disc, Msg={FromCar, _Route = [Pos | _]}},W) ->
+  Cars = get_car_neighbourhood(W, FromCar, Pos, ?PROX_RANGE),
   broadcast_discover(Msg, Cars),
   {noreply, W};
 handle_cast({check_fault, Node}, W = #world{undir = G}) ->
-  {Node, {_Type, Cars}} = graph:get_vertex_label(G, Node),
+  {Node, {_Type, Cars}} = graph:vertex(G, Node),
   lists:foreach(fun(Car) ->
                     spawn(?MODULE, check_car_status, [Car, Node])
                 end,
