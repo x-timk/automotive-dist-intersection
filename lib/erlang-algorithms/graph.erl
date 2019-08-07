@@ -59,7 +59,7 @@
 -export([from_file/1, from_file/3, del_graph/1, vertices/1, edges/1, edge_weight/2,
          edges_with_weights/1, out_neighbours/2, num_of_vertices/1, equal/2,
          num_of_edges/1, pprint/1, empty/1, empty/2, add_vertex/2, add_edge/3,
-         add_edge/4, graph_type/1, del_edge/2, weight_type/1, export/3, import/2, get_vertex_label/2, add_vertex/3]).
+         add_edge/4, graph_type/1, del_edge/2, weight_type/1, export/3, import/2, vertex/2, add_vertex/3]).
 
 -export_type([graph/0, vertex/0, edge/0, weight/0]).
 
@@ -187,7 +187,7 @@ weight_type(G) ->
 %% @doc Add a vertex to a graph
 -spec add_vertex(graph(), vertex()) -> vertex().
 
-get_vertex_label(G, V) ->
+vertex(G, V) ->
   digraph:vertex(G#graph.graph, V).
 
 add_vertex(G, V) ->
