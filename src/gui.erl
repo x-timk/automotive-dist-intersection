@@ -25,9 +25,11 @@
 -record(state,
         {
          win,
+         canvas,
          cars,
-         node_position,
-         canvas
+         nodes_position,
+         bg_info,
+         bg_bitmap
         }).
 
 -record(car,
@@ -42,7 +44,8 @@ start() ->
 
 init(_Options) ->
   wx:new(),
-  Route = annotate_route_with_direction([i_est1,c_nordest, c_center, c_sudovest, o_sud1], initNodePositions()),
+  NodesPosition = init_nodes_position(),
+  Route = annotate_route_with_direction([i_est1,c_nordest, c_center, c_sudovest, o_sud1], NodesPosition),
   Cars = #{car1 => #car{name=car1, route=Route},
            car2 => #car{name=car2, route=tl(Route)},
            car3 => #car{name=car3, route=tl(tl(Route))},
@@ -81,31 +84,49 @@ init(_Options) ->
   wxSizer:add(InfoPanelSizer, Text1, [{proportion, 1}, {flag, ?wxEXPAND}]),
   %% wxSizer:add(InfoPanelSizer, Text2, [{proportion, 1}, {flag, ?wxEXPAND}]),
   SimulationPanel = wxPanel:new(TopSplitter, []),% {style, ?wxFULL_REPAINT_ON_RESIZE}]),
-  MainSizer = wxBoxSizer:new(?wxVERTICAL),
-  Sizer = wxStaticBoxSizer:new(?wxVERTICAL, SimulationPanel,
+  SimulationSizer = wxBoxSizer:new(?wxVERTICAL),
+  DrawingSizer = wxStaticBoxSizer:new(?wxVERTICAL, SimulationPanel,
                                [{label, "Simulation"}]),
   %% SimulationSizer = wxStaticBoxSizer:new(?wxVERTICAL,
   %%                                     DrawingPanel,
   %%                                     [{label, "Simulation"}]),
-  DrawingPanel = wxPanel:new(SimulationPanel, [{style, ?wxFULL_REPAINT_ON_RESIZE}]),
-  wxSizer:add(Sizer, DrawingPanel, [{flag, ?wxEXPAND},
-                                    {proportion, 1}]),
-  wxSizer:add(MainSizer, Sizer, [{flag, ?wxEXPAND},
-                                 {proportion, 1}]),
-  wxPanel:setSizer(SimulationPanel, MainSizer),
-  wxSizer:layout(MainSizer),
+  DrawingPanel = wxPanel:new(SimulationPanel,
+                             [{style, ?wxFULL_REPAINT_ON_RESIZE}]),
+  wxSizer:add(DrawingSizer, DrawingPanel,
+              [{flag, ?wxEXPAND}, {proportion, 1}]),
+  wxSizer:add(SimulationSizer, DrawingSizer,
+              [{flag, ?wxEXPAND}, {proportion, 1}]),
+  wxPanel:setSizer(SimulationPanel, SimulationSizer),
+  wxSizer:layout(SimulationSizer),
   %% Text2 = wxTextCtrl:new(DrawingPanel,
   %%                        ?wxID_ANY,
   %%                        [{style, ?wxTE_READONLY bor ?wxTE_CENTRE},
   %%                         {value, "Info delle macchine"}]),
   %% wxSizer:add(DrawingSizer, Text2, [{proportion, 1}, {flag, ?wxEXPAND}]),
   wxPanel:connect(DrawingPanel, paint, [callback]),
+  wxPanel:connect(DrawingPanel, erase_background, [callback]),
   wxSplitterWindow:splitVertically(TopSplitter, InfoPanel, SimulationPanel,
                                    [{sashPosition, 0}]),
+
+  {W, H} = wxPanel:getSize(DrawingPanel),
+  BgBitmap = wxBitmap:new(W, H),
+  %% MDC = wxMemoryDC:new(BgBitmap),
+  BackgroundInfo = init_background_info(NodesPosition),
+  %% CDC = wxClientDC:new(DrawingPanel),
+  %% GCDC = wxGCDC:new(MDC),
+  %% drawBackground(GCDC, BackgroundInfo, {W, H}),
+  %% wxMemoryDC:destroy(MDC),
+
   wxFrame:show(Frame),
   wxWindow:refresh(DrawingPanel),
   wxSplitterWindow:setSashGravity(TopSplitter,   1.0),
-  {Frame, #state{win=Frame, canvas=DrawingPanel, cars=Cars}}.
+  {Frame, #state{
+             win=Frame,
+             canvas=DrawingPanel,
+             cars=Cars,
+             nodes_position=NodesPosition,
+             bg_info=BackgroundInfo,
+             bg_bitmap=BgBitmap}}.
 
 
 terminate(_Reason, #state{win=Frame}) ->
@@ -123,25 +144,27 @@ terminate(_Reason, #state{win=Frame}) ->
 %% Sync event from callback events, paint event must be handled in callbacks
 %% otherwise nothing will be drawn on windows.
 handle_sync_event(#wx{event=#wxPaint{}}, _wxObj,
-                  _State = #state{canvas=Canvas, cars=Cars}) ->
-  {W, H} = wxPanel:getSize(Canvas),
-  GraphBitmap = wxBitmap:new(W, H),
-  DC = wxMemoryDC:new(GraphBitmap),
-  CDC = wxPaintDC:new(Canvas),
-  NodePos = initNodePositions(),
-  NodeDir = initNodeDirection(),
-  BackgroundInfo = background_info(),
-  draw(CDC, NodePos),
-  drawBackground(CDC, BackgroundInfo, {W, H}),
-  drawCars(CDC, NodePos, NodeDir, Cars),
+                  _State = #state{canvas=Canvas, cars=Cars,
+                                  nodes_position=NodesPos,
+                                  bg_info=BgInfo}) ->
+  %% {W, H} = wxPanel:getSize(Canvas),
+  %% GraphBitmap = wxBitmap:new(W, H),
+  %% DC = wxMemoryDC:new(GraphBitmap),
+  PaintDC = wxPaintDC:new(Canvas),
+  drawBackground(PaintDC, BgInfo),
+  drawCars(PaintDC, NodesPos, Cars),
+  %% draw(PaintDC, NodesPos),
   %% wxDC:blit(CDC, {0,0},
   %%           {wxBitmap:getWidth(GraphBitmap), wxBitmap:getHeight(GraphBitmap)},
   %%           DC, {0,0}),
-  wxWindowDC:destroy(CDC),
-  wxMemoryDC:destroy(DC),
-  wxBitmap:destroy(GraphBitmap),
-  ok.
+  wxWindowDC:destroy(PaintDC),
+  %% wxMemoryDC:destroy(DC),
+  %% wxBitmap:destroy(GraphBitmap),
+  ok;
 
+handle_sync_event(#wx{event=#wxErase{}}, _wxObj,
+                  _State = #state{}) ->
+  ok.
 
 %% Async Events
 handle_event(#wx{event=#wxClose{}}, State = #state{}) ->
@@ -151,6 +174,7 @@ handle_event(#wx{event=#wxClose{}}, State = #state{}) ->
 handle_event(#wx{event=#wxCommand{type=command_menu_selected}}, State = #state{}) ->
   io:format("Closing window~n", []),
   {stop, normal, State}.
+
 
 %% Notify Events
 handle_cast({?POS_UPDATE, Car, Position}, State = #state{cars=Cars}) ->
@@ -180,7 +204,7 @@ track_new_car(Car) ->
 
 %%%%%%%%%%%%%%%%
 %% Local Functions
-initNodePositions() ->
+init_nodes_position() ->
   %% Nodes are placed in a 10x10 grid with the intersection center at (5,5).
   #{
     i_nord1 => {4, 3},
@@ -214,40 +238,6 @@ initNodePositions() ->
     c_center => {5, 5}
    }.
 
-initNodeDirection() ->
-  %% Nodes are placed in a 10x10 grid with the intersection center at (5,5).
-  #{
-    i_nord1 => 270,
-    i_nord2 => 270,
-    i_nord3 => 270,
-    o_nord1 => 90,
-    o_nord2 => 90,
-    o_nord3 => 90,
-    i_est1 => 180,
-    i_est2 => 180,
-    i_est3 => 180,
-    o_est1 => 0,
-    o_est2 => 0,
-    o_est3 => 0,
-    i_sud1 => 90,
-    i_sud2 => 90,
-    i_sud3 => 90,
-    o_sud1 => 270,
-    o_sud2 => 270,
-    o_sud3 => 270,
-    i_ovest1 => 0,
-    i_ovest2 => 0,
-    i_ovest3 => 0,
-    o_ovest1 => 180,
-    o_ovest2 => 180,
-    o_ovest3 => 180,
-    c_nordovest => undefined,
-    c_nordest => undefined,
-    c_sudovest => undefined,
-    c_sudest => undefined,
-    c_center => undefined
-   }.
-
 annotate_route_with_direction(Route, Positions) ->
   RouteWithNext = zip(Route, tl(Route)),
   {RouteDir, {LastNode, LastDir}} =
@@ -277,11 +267,11 @@ annotate_route_with_direction(Route, Positions) ->
       RouteWithNext),
   RouteDir ++ [{LastNode, LastDir}].
 
-background_info() ->
+init_background_info(RoadPositions) ->
   GridColumns = lists:seq(0,?GRID_WIDTH-1),
   GridRows = lists:seq(0,?GRID_HEIGHT-1),
   GridCells = [{X,Y} || X <- GridColumns, Y <- GridRows],
-  RoadCells = maps:values(initNodePositions()),
+  RoadCells = maps:values(RoadPositions),
   GridCellsInfo =
     lists:map(
       fun (Pos) ->
@@ -294,19 +284,19 @@ background_info() ->
       GridCells),
   GridCellsInfo.
 
-draw(DC, Nodes = #{c_nordest := Pt1, c_sudovest := Pt2, c_nordovest := Pt3}) ->
+draw(DC, Nodes = #{i_est1 := Pt1, o_sud1 := Pt2, c_nordovest := Pt3}) ->
   {W, H} = wxDC:getSize(DC),
   Normalize = fun({X, Y}) ->
-                  {trunc(X/?GRID_WIDTH*W), trunc(Y/?GRID_HEIGHT*H)}
+                  {trunc((X+0.5)/?GRID_WIDTH*W), trunc((Y+0.5)/?GRID_HEIGHT*H)}
               end,
-  Center = fun({X, Y}) -> {X - 0.5, Y -0.5} end,
-  wxDC:setBrush(DC, ?wxWHITE_BRUSH),
-  wx:foreach(fun ({_Node, {XC, YC}}) ->
-                 Point = Normalize({XC-0.5, YC-0.5}),
-                 Size = Normalize({1, 1}),
-                 wxDC:drawRectangle(DC, Point, Size)
-             end,
-             maps:to_list(Nodes)),
+  %% Center = fun({X, Y}) -> {X - 0.5, Y -0.5} end,
+  %% wxDC:setBrush(DC, ?wxWHITE_BRUSH),
+  %% wx:foreach(fun ({_Node, {XC, YC}}) ->
+  %%                Point = Normalize({XC-0.5, YC-0.5}),
+  %%                Size = Normalize({1, 1}),
+  %%                wxDC:drawRectangle(DC, Point, Size)
+  %%            end,
+  %%            maps:to_list(Nodes)),
   Overlay = wxOverlay:new(),
   ODC = wxDCOverlay:new(Overlay, DC),
   wxDC:setBrush(DC, ?wxRED_BRUSH),
@@ -329,11 +319,11 @@ draw(DC, Nodes = #{c_nordest := Pt1, c_sudovest := Pt2, c_nordovest := Pt3}) ->
   wxDCOverlay:destroy(ODC),
   wxOverlay:destroy(Overlay).
 
-drawCars(DC, NodePositions, _NodeDirections, Cars) ->
+drawCars(DC, NodePositions, Cars) ->
   {W, H} = wxDC:getSize(DC),
   GC = wxGraphicsContext:create(DC),
   wx:foreach(fun ({_Name, Car = #car{route=[_Pos | _]}}) ->
-                 drawCar(GC, Car, NodePositions, _NodeDirections, {W,H})
+                 drawCar(GC, Car, NodePositions, {W,H})
                  %% Text = atom_to_list(_Name),
                  %% {TW, TH} = wxDC:getTextExtent(DC, Text),
                  %% Normalize = fun({X, Y}) ->
@@ -350,9 +340,8 @@ drawCars(DC, NodePositions, _NodeDirections, Cars) ->
   wxGraphicsObject:destroy(GC).
 
 drawCar(GC,
-        _Car = #car{name=_Name, route=[{CurrentNode, CarDirection} | Route]},
+        _Car = #car{name=_Name, route=[{CurrentNode, CarDirection} | _]},
         NodePositions,
-        _NodeDirections,
         {WW, WH}) ->
   {X,Y} = maps:get(CurrentNode, NodePositions),
   %% CarDirection = case maps:get(CurrentNode, NodeDirections) of
@@ -388,24 +377,32 @@ drawCar(GC,
   wxGraphicsObject:destroy(Matrix),
   wxGraphicsObject:destroy(Path).
 
-drawBackground(DC, InfoGrid, {WW, WH}) ->
+drawBackground(DC, InfoGrid) ->
+  {WW, WH} = wxDC:getSize(DC),
   GC = wxGraphicsContext:create(DC),
   wx:foreach(
     fun ({{X,Y}, Type}) ->
         XScale = WW /?GRID_WIDTH,
         YScale = WH /?GRID_HEIGHT,
-        Normalize = fun({X, Y}) ->
-                        {X*XScale, Y*YScale}
+        Normalize = fun({XLocal, YLocal}) ->
+                        {XLocal*XScale, YLocal*YScale}
                     end,
         {RX, RY} = Normalize({X, Y}),
         {RW, RH} = Normalize({1,1}),
         case Type of
-          grass -> wxGraphicsContext:setBrush(GC, ?wxGREEN_BRUSH),
-                   wxGraphicsContext:setPen(GC, ?wxGREEN_PEN);
-          road -> wxGraphicsContext:setBrush(GC, ?wxGREY_BRUSH),
-                  wxGraphicsContext:setPen(GC, ?wxGREY_PEN)
+          grass ->
+            wxGraphicsContext:setBrush(GC, ?wxGREEN_BRUSH),
+            wxGraphicsContext:setPen(GC, ?wxGREEN_PEN);
+            %% wxDC:setBrush(MemoryDC, ?wxGREEN_BRUSH),
+            %% wxDC:setPen(MemoryDC, ?wxGREEN_PEN);
+          road ->
+            wxGraphicsContext:setBrush(GC, ?wxGREY_BRUSH),
+            wxGraphicsContext:setPen(GC, ?wxGREY_PEN)
+            %% wxDC:setBrush(MemoryDC, ?wxGREY_BRUSH),
+            %% wxDC:setPen(MemoryDC, ?wxGREY_PEN)
         end,
         wxGraphicsContext:drawRectangle(GC,RX, RY, RW, RH)
+        %% wxDC:drawRectangle(MemoryDC, RX, RY, RW, RH)
     end,
     InfoGrid),
   wxGraphicsObject:destroy(GC).
