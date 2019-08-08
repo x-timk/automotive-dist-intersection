@@ -22,6 +22,9 @@
 -define(GRID_WIDTH, 11).
 -define(PI_QUARTERS, 0.7853981633974483).
 
+%% wxWidgets constants
+-define(SPAWN_BUTTON, 10).
+
 -record(state,
         {
          win,
@@ -29,7 +32,7 @@
          cars,
          nodes_position,
          bg_info,
-         bg_bitmap
+         spawn_position = 0
         }).
 
 -record(car,
@@ -46,11 +49,13 @@ init(_Options) ->
   wx:new(),
   NodesPosition = init_nodes_position(),
   Route = annotate_route_with_direction([i_est1,c_nordest, c_center, c_sudovest, o_sud1], NodesPosition),
+  Route2 = annotate_route_with_direction([i_nord1,c_nordovest, c_nord, c_nordest, o_nord1], NodesPosition),
   Cars = #{car1 => #car{name=car1, route=Route},
            car2 => #car{name=car2, route=tl(Route)},
            car3 => #car{name=car3, route=tl(tl(Route))},
            car4 => #car{name=car4, route=tl(tl(tl(Route)))},
-           car5 => #car{name=car5, route=tl(tl(tl(tl(Route))))}
+           car5 => #car{name=car5, route=tl(tl(tl(tl(Route))))},
+           car6 => #car{name=car6, route=tl(Route2)}
           },
   process_flag(trap_exit, true),
   Frame = wxFrame:new(wx:null(),
@@ -73,19 +78,29 @@ init(_Options) ->
 
   wxSplitterWindow:setSashGravity(TopSplitter,   0.5),
   InfoPanel = wxPanel:new(TopSplitter),
-  InfoPanelSizer = wxStaticBoxSizer:new(?wxVERTICAL,
-                                        InfoPanel,
-                                        [{label, "Cars"}]),
+  InfoPanelSizer = wxBoxSizer:new(?wxVERTICAL),
+  CommandsSizer = wxStaticBoxSizer:new(?wxHORIZONTAL,
+                                       InfoPanel,
+                                       [{label, "Commands"}]),
   wxPanel:setSizer(InfoPanel, InfoPanelSizer),
   Text1 = wxTextCtrl:new(InfoPanel,
                          ?wxID_ANY,
                          [{style, ?wxTE_READONLY bor ?wxTE_CENTRE},
                           {value, "Info delle macchine"}]),
+  SpawnButton = wxButton:new(InfoPanel, ?SPAWN_BUTTON, [{label, "Spawn Car"}]),
+  wxSizer:add(CommandsSizer, SpawnButton, [{proportion, 0}, {border, 4},
+                                           {flag, ?wxALL}]),
+  wxSizer:add(InfoPanelSizer, CommandsSizer, [{proportion, 0}, {border, 4},
+                                              {flag, ?wxALL bor ?wxEXPAND}]),
   wxSizer:add(InfoPanelSizer, Text1, [{proportion, 1}, {flag, ?wxEXPAND}]),
+  wxSizer:layout(InfoPanelSizer),
+
+  wxButton:connect(SpawnButton, command_button_clicked),
+
   %% wxSizer:add(InfoPanelSizer, Text2, [{proportion, 1}, {flag, ?wxEXPAND}]),
   SimulationPanel = wxPanel:new(TopSplitter, []),% {style, ?wxFULL_REPAINT_ON_RESIZE}]),
   SimulationSizer = wxBoxSizer:new(?wxVERTICAL),
-  DrawingSizer = wxStaticBoxSizer:new(?wxVERTICAL, SimulationPanel,
+  DrawingSizer = wxStaticBoxSizer:new(?wxHORIZONTAL, SimulationPanel,
                                [{label, "Simulation"}]),
   %% SimulationSizer = wxStaticBoxSizer:new(?wxVERTICAL,
   %%                                     DrawingPanel,
@@ -108,8 +123,6 @@ init(_Options) ->
   wxSplitterWindow:splitVertically(TopSplitter, InfoPanel, SimulationPanel,
                                    [{sashPosition, 0}]),
 
-  {W, H} = wxPanel:getSize(DrawingPanel),
-  BgBitmap = wxBitmap:new(W, H),
   %% MDC = wxMemoryDC:new(BgBitmap),
   BackgroundInfo = init_background_info(NodesPosition),
   %% CDC = wxClientDC:new(DrawingPanel),
@@ -125,8 +138,7 @@ init(_Options) ->
              canvas=DrawingPanel,
              cars=Cars,
              nodes_position=NodesPosition,
-             bg_info=BackgroundInfo,
-             bg_bitmap=BgBitmap}}.
+             bg_info=BackgroundInfo}}.
 
 
 terminate(_Reason, #state{win=Frame}) ->
@@ -167,6 +179,10 @@ handle_sync_event(#wx{event=#wxErase{}}, _wxObj,
   ok.
 
 %% Async Events
+handle_event(#wx{id=?SPAWN_BUTTON, event=#wxCommand{type=command_button_clicked}}, State = #state{}) ->
+  io:format("Button Clicked~n", []),
+  {noreply, State};
+
 handle_event(#wx{event=#wxClose{}}, State = #state{}) ->
   io:format("Closing window~n", []),
   {stop, normal, State};
@@ -174,7 +190,6 @@ handle_event(#wx{event=#wxClose{}}, State = #state{}) ->
 handle_event(#wx{event=#wxCommand{type=command_menu_selected}}, State = #state{}) ->
   io:format("Closing window~n", []),
   {stop, normal, State}.
-
 
 %% Notify Events
 handle_cast({?POS_UPDATE, Car, Position}, State = #state{cars=Cars}) ->
@@ -235,8 +250,46 @@ init_nodes_position() ->
     c_nordest => {6, 4},
     c_sudovest => {4, 6},
     c_sudest => {6, 6},
-    c_center => {5, 5}
+    c_center => {5, 5},
+    c_nord => {5, 4},
+    c_est => {6, 5},
+    c_sud => {5, 6},
+    c_ovest => {4, 5}
    }.
+
+%% init_nodes_position() ->
+%%   %% Nodes are placed in a 10x10 grid with the intersection center at (5,5).
+%%   #{
+%%     i_nord1 => {4, 3},
+%%     i_nord2 => {4, 2},
+%%     i_nord3 => {4, 1},
+%%     o_nord1 => {5, 3},
+%%     o_nord2 => {5, 2},
+%%     o_nord3 => {5, 1},
+%%     i_est1 => {6, 4},
+%%     i_est2 => {7, 4},
+%%     i_est3 => {8, 4},
+%%     o_est1 => {6, 5},
+%%     o_est2 => {7, 5},
+%%     o_est3 => {8, 5},
+%%     i_sud1 => {5, 6},
+%%     i_sud2 => {5, 7},
+%%     i_sud3 => {5, 8},
+%%     o_sud1 => {4, 6},
+%%     o_sud2 => {4, 7},
+%%     o_sud3 => {4, 8},
+%%     i_ovest1 => {3, 5},
+%%     i_ovest2 => {2, 5},
+%%     i_ovest3 => {1, 5},
+%%     o_ovest1 => {3 , 4},
+%%     o_ovest2 => {2 , 4},
+%%     o_ovest3 => {1 , 4},
+%%     c_nordovest => {4, 4},
+%%     c_nordest => {5, 4},
+%%     c_sudovest => {4, 5},
+%%     c_sudest => {5, 5},
+%%     c_center => {4.5, 4.5}
+%%    }.
 
 annotate_route_with_direction(Route, Positions) ->
   RouteWithNext = zip(Route, tl(Route)),
@@ -256,12 +309,13 @@ annotate_route_with_direction(Route, Positions) ->
                       true -> PrevNodeDirection
                     end,
           DiffAngle = Direction - PrevDir,
+          io:format("~p ~p ~f~n", [CurrentNode, NextNode, DiffAngle]),
           NormalizedAngle = math:acos(abs(math:cos(DiffAngle))),
           ReducedDiffAngle = if
                                NormalizedAngle >= ?PI_QUARTERS -> DiffAngle/2;
                                NormalizedAngle < ?PI_QUARTERS -> 0.0
                              end,
-          {{CurrentNode, Direction-ReducedDiffAngle}, {NextNode, Direction}}
+          {{CurrentNode, Direction - ReducedDiffAngle}, {NextNode, Direction}}
       end,
       {undefined, undefined},
       RouteWithNext),
@@ -284,7 +338,7 @@ init_background_info(RoadPositions) ->
       GridCells),
   GridCellsInfo.
 
-draw(DC, Nodes = #{i_est1 := Pt1, o_sud1 := Pt2, c_nordovest := Pt3}) ->
+draw(DC, _Nodes = #{i_est1 := Pt1, o_sud1 := Pt2, c_nordovest := Pt3}) ->
   {W, H} = wxDC:getSize(DC),
   Normalize = fun({X, Y}) ->
                   {trunc((X+0.5)/?GRID_WIDTH*W), trunc((Y+0.5)/?GRID_HEIGHT*H)}
