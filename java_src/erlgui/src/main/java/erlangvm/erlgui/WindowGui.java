@@ -554,17 +554,17 @@ public class WindowGui {
 				String nodename = remoteErlangNode.getText() + "@" + remoteErlangIp.getText();
 				System.out.println("NodeName is: " + nodename);
 //				node = new OtpNode(nodename);
-				System.out.println("DONE1");
+//				System.out.println("DONE1");
 				
 		        OtpPeer peer = new OtpPeer(nodename);
 		        
 		        String localnodeName = localErlangNode.getText() + "@" + ips.getSelectedItem().toString();
 		        System.out.println("Local Node is: " + localnodeName);
 				node = new OtpNode(localnodeName, "guitar");
-		        System.out.println("DONE2");
+//		        System.out.println("DONE2");
 
 				
-		        System.out.println("DONE3");
+//		        System.out.println("DONE3");
 
 //		        n1 = new OtpNode("jv@Altro-MB.local", "guitar");
 
@@ -573,7 +573,7 @@ public class WindowGui {
 
 		        connection = self.connect(peer);
 
-		        System.out.println("DONE4");
+//		        System.out.println("DONE4");
 		        
 				ErlMBox receiver = new ErlMBox(window, node);
 				receiver.start();

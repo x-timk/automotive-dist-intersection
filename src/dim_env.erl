@@ -23,7 +23,6 @@
 -define(GENSERVER_CALL_TIMEOUT, 10000).
 
 -behaviour(gen_server).
--behaviour(application).
 %% Simple print to console
 %% print( What) ->
 %%   MyPid = pid_to_list(self()) ++ ":",
