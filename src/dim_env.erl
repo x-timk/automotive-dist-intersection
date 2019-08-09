@@ -21,11 +21,10 @@
                }).
 
 %% portata antenna wireless a bordo di ogni auto
--define(PROX_RANGE, 7).
+-define(PROX_RANGE, 5).
 -define(GENSERVER_CALL_TIMEOUT, 10000).
 
 -behaviour(gen_server).
--behaviour(application).
 %% Simple print to console
 %% print( What) ->
 %%   MyPid = pid_to_list(self()) ++ ":",
@@ -56,7 +55,7 @@ create_world() ->
       maps:new(),
       Vertices),
   VertexNeighbours =
-    maps:fromList(
+    maps:from_list(
       lists:map(
         fun(Vertex) ->
             {Vertex, get_neighbourhood(UndirGraph, Vertex, ?PROX_RANGE)}
@@ -221,24 +220,16 @@ get_neighbourhood(G, V, Range) ->
   ).
 
 %% Restituisco lista di auto vicine a Car
-get_car_neighbourhood(#world{undir=G, vertex_neighbours=VNMap}, Car, Pos, Range) ->
-  V = get_car_vertex(G, Car),
-  %% TODO: testare che il risultato di vertex coincida con il risultato di
-  %% get_car_vertex e in caso poisitivo rimuovere la chiamata a get_car_vertex
-  {V, _} = graph:vertex(G, Pos),
-  Neighbourhood = get_neighbourhood(G, V, Range),
-  %% TODO: testare la mappa dei vicini, se funziona rimuovere la chiamata a
-  %% get_neighbourhood
-  Neighbourhood = maps:get(V, VNMap),
+get_car_neighbourhood(#world{undir=G, vertex_neighbours=VNMap}, Car, {Pos, _}) ->
+  Neighbourhood = maps:get(Pos, VNMap),
   NeighbourCars =
     lists:append(
       lists:map(
         fun (Node) ->
-            {_, {_Type, Cars}} = graph:vertex(G, Node),
+            {_, {_, Cars}} = graph:vertex(G, Node),
             Cars
         end,
         Neighbourhood)),
-  %% NeighbourhoodVertices = get_vertex_cars_array(G, Neighbourhood),
   %% Cancello me stesso dalla lista dei vicini
   Res = lists:delete(Car, NeighbourCars),
   Res.
@@ -269,19 +260,6 @@ move_from_to(G, Car, From, To) ->
   add_car_to_vertex(G, To, Car),
   G.
 
-%% Data una macchina trovo il vertice nel grafo dove si trova
-get_car_vertex(G, Car) ->
-  AllVertex = graph:vertices(G),
-  aux_get_car_vertex(G, AllVertex, Car).
-
-aux_get_car_vertex(_, [], _) ->
-  false;
-aux_get_car_vertex(G, [H|T], Car) ->
-  {_, {_, Cars}} = graph:vertex(G, H),
-  case lists:member(Car, Cars) of
-    false -> aux_get_car_vertex(G, T, Car);
-    true -> H
-  end.
 
 %% Scorro lista di auto e mando disc a tutti
 %% Simulo broadcast dall'auto
@@ -381,7 +359,7 @@ notify_move(CarName, CurrentPos, NextPos) ->
 
 
 handle_cast({disc, Msg={FromCar, _Route = [Pos | _]}},W) ->
-  Cars = get_car_neighbourhood(W, FromCar, Pos, ?PROX_RANGE),
+  Cars = get_car_neighbourhood(W, FromCar, Pos),
   broadcast_discover(Msg, Cars),
   {noreply, W};
 handle_cast({check_fault, Node}, W = #world{undir = G}) ->
