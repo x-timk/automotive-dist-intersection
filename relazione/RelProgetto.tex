@@ -12,7 +12,8 @@
 \usepackage{minted}
 
 
-\title{Implementazione di un sistema di incrocio stradale intelligente \\ for the Project of Distributed Systems}
+\title{Implementazione di un Incrocio Stradale Intelligente\\per il Progetto di
+  Sistemi Distribuiti}
 
 \author{Tiziano Mele\\Valentino Picotti\\DMIF, University of Udine, Italy}
 
@@ -21,7 +22,6 @@
 \begin{document}
 
 
-%\begin{titlingpage}
 \maketitle
 \begin{abstract}
   Un sistema di incrocio stradale intelligente vuole essere una soluzione al
@@ -31,7 +31,6 @@
   una soluzione che permetta di eliminare le lanterne semaforiche in modo da
   ridurre i tempi medi di attesa dei veicoli in coda.
 \end{abstract}
-%\end{titlingpage}
 
 \chapter{Introduzione}\label{ch:intro}
 
@@ -40,15 +39,6 @@ distribuito, dove i singoli veicoli sono entità indipendenti e con conoscenza
 parziale dell'ambiente circostante data dalla sensoristica di bordo. Compito dei
 veicoli è quello di formare una rete peer-to-peer che permetta loro di
 comunicare autonomamente, senza bisogno di un server centrale.
-
-% TODO: Da riconsiderare per capitolo 3.1
-% Inoltre la soluzione mira ad essere fisicamente plausibile, ipotizzando un
-% deploy in una situazione reale (o mondo reale)
-% soluzione fisicamente plausibile
-% al funzionamento fisico della sensoristica
-% Molte scelte sono state effettuate pensando al livello tecnologico della
-% sensoristica ad oggi disponibile; ad esempio è stato tenuto conto del fatto che
-% i dispositivi wireless hanno un raggio di azione limitato.
 
 I principali requisiti che si vogliono soddisfare sono:
 \begin{description}
@@ -179,120 +169,6 @@ Inoltre la soluzione soddisfa le seguenti trasparenza:
   posizione del leader, che può essere uno qualsiasi fra i veicoli presenti.
 \end{description}
 
-
-%Come primo passaggio viene creato un processo "environment" dove viene salvato
-%lo stato globale dell'incrocio. L'incrocio viene tradotto in un grafo orientato
-%pesato, dove ogni nodo conterrà le seguenti informazioni:
-%\begin{itemize}
-%\item Nome
-%\item Tipologia di nodo: TailNode(Nodo in coda) TopNode (Nodo in prossimità di
-%  un incrocio) CrossNode(Nodo incrocio)
-%\item Elenco di macchine che occupano il nodo stesso
-%\end{itemize}
-%Il peso degli archi del grafo viene assegnato in base alla distanza fisica tra i
-%due nodi.
-%Questo modulo viene interrogato dalle varie macchine per simulare dati relativi
-%alla sensoristica.
-%
-%Ogni veicolo sarà implementato come un processo che quindi potrà interrogare i
-%sensori per ottenere le informazioni su posizione, ostacoli, percorso più breve
-%verso la sua destinazione.
-%
-%Le macchine sono in relazione client-server con l'environment. Ogni automobile è
-%una macchina a stati finiti per la quale si prevede di utilizzare il behaviour
-%di erlang gen\_statem. Gli stati principali per un veicolo sono:
-%\begin{itemize}
-%\item \texttt{INQUEQUE}: La macchina si trova in questo stato quando è in coda
-%  (non è la prima macchina della fila)
-%\item \texttt{DISCOVER}: La macchina è la prima della file. In questo stato la
-%  macchina manda un broadcast per scoprire le auto vicine.
-%\item \texttt{ELECTION}: La macchina è la prima della fila. E' in corso
-%  l'elezione di un leader dell'incrocio
-%\item \texttt{SLAVE}: L'elezione si è conclusa e la macchina non è leader. Mando
-%  il mio percorso al leader e attendo risposta "verde"/"rosso".
-%\item \texttt{M-FETCH}: La macchina è stata eletta leader dell'incrocio. Attendo
-%  i percorsi delle macchine SLAVE.
-%\item \texttt{M-COORD}: In base ai percorsi e alle priorità delle macchine mando
-%  messaggi "verde"/"rosso" agli SLAVE.
-%\item \texttt{CROSSING}: La macchina è in questo stato se si trova su un nodo
-%  del grafo di tipo CrossNode.
-%\item \texttt{PH-FAULT}: La macchina ha un guasto fisico.
-%\end{itemize}
-%
-%Ogni veicolo può ricevere uno dei seguenti eventi:
-%\begin{itemize}
-%\item \texttt{disc}: La macchina è appena arrivata in prossimità dell'incrocio e
-%  manda in broadcast un "discover" con il suo pid e il suo percorso. A livello
-%  pratico per simulare il broadcast il messaggio di discover viene mandato
-%  all'environment che poi rigira alle altre macchine. Queste quindi a loro volta
-%  mandano un messaggio di "hellofrom" alla nuova macchina (con il loro
-%  percorso).
-%\item \texttt{disc\_tm}: lo stato \texttt{DISCOVER} ha un suo timeout. Una volta
-%  trascorso viene innescato questo evento.
-%\item \texttt{wait(tag:*)}: se la macchina si trova in stato \texttt{DISCOVER} e
-%  riceve questo evento rimane nello stato \texttt{DISCOVER} e resetta il
-%  timeout.
-%\item \texttt{hello(pid)}: se la macchina si trova in stato \texttt{DISCOVER},
-%  mi salvo il pid ricevuto tra i conosciuti.
-%\item \texttt{elect}: Messaggio di \emph{election} dell'algoritmo bully.
-%\item \texttt{coord}: Messaggio di \emph{coordinator} dell'algoritmo bully.
-%\item \texttt{ans}: Messaggio di \emph{answer} dell'algoritmo bully.
-%\item \texttt{elect\_tm}: Evento di timeout (elezione fallita) dell'algoritmo bully.
-%\item \texttt{route}: messaggio contenente id, priorità, lista macchine con cui
-%  è in conflitto.
-%\item \texttt{route\_tm}: evento di timeout per lo stato \texttt{M-FETCH}.
-%\item \texttt{green}: Messaggio che notifica a macchina in stato \texttt{SLAVE}
-%  che può attraversare incrocio.
-%\item \texttt{red}: Messaggio che notifica a macchina in stato \texttt{SLAVE}
-%  che non può attraversare incrocio.
-%\item \texttt{gr\_timeout}: evento di timeout per lo stato \texttt{SLAVE} e
-%  \texttt{M-COORD}.
-%\end{itemize}
-%
-%\begin{figure}
-%  \centering
-%  \begin{tikzpicture}[shorten >=1pt, node distance=2.5cm,on grid,auto, bend
-%    angle=30, font=\footnotesize\ttfamily]
-%    \node[state,initial] (queue) {INQUEUE};%
-%    \node[state] (disc) [right=of queue] {DISCOVER};%
-%    \node[state] (elec) [right=of disc,xshift=0.5cm] {ELECTION};%
-%    \node[state] (slave) [xshift=1cm,above right=of elec] {SLAVE};%
-%    \node[state] (m-fetch) [xshift=1cm,below right=of elec] {M-FETCH};%
-%    \node[state] (m-coord) [right=of m-fetch,xshift=0.5cm] {M-COORD};%
-%    \node[state] (cross) [above right=of m-coord] {CROSSING};%
-%    \node[state,initial,initial text=fault] (fault) [below=of disc]
-%    {PH-FAULT};%
-%    \path[->]%
-%    (queue) edge node {on\_top} (disc)%
-%    (disc) edge [loop above] node[xshift=-0.2cm] {disc,hello,wait} ()%
-%    edge node {disc\_tm} (elec)%
-%    edge [bend right] node[yshift=-0.5cm] {elec} (elec)%
-%    edge [bend left] node[yshift=0.1cm,xshift=0.7cm] {coord} (slave)%
-%    (elec) edge [loop below] node {disc,elect,ans} ()%
-%    edge node {coord} (slave)%
-%    edge [bend right] node[yshift=0.45cm] {elec\_tm} (disc)%
-%    edge node[xshift=-0.4cm,yshift=0.2cm] {master} (m-fetch)%
-%    (slave) edge [loop
-%    above] node {disc} () edge node {green} (cross) edge [bend right=50]
-%          node[xshift=-0.5cm,yshift=0.7cm] {red,gr\_tm} (disc) (m-fetch) edge
-%          [loop above] node {route,disc} () edge node {route\_tm} (m-coord)
-%          (m-coord) edge [loop above] node {disc,route} () edge [below] node
-%          [xshift=0.5cm] {green} (cross) edge [bend left=50] node {red,gr\_tm}
-%          (disc) (cross) edge [loop above] node {disc} ();
-% \end{tikzpicture}
-% \caption{Car: Finite State Machine}
-%\end{figure}
-%
-%Ogni veicolo ha un suo valore di priorità iniziale, che viene incrementato ogni
-%volta che il veicolo riceve il messaggio \texttt{red} (lo può ricevere solo se è
-%in stato \texttt{SLAVE} o \texttt{M-COORD}). Il leader dell'incrocio decide chi
-%far passare nel seguente modo:
-%\begin{itemize}
-%\item Ordina le macchine per priorità;
-%\item Farà sicuramente passare la prima.
-%\item Calcola un insieme massimale di macchine indipendenti rispetto alla prima
-%\end{itemize}
-
 \chapter{Progetto}
 
 \section{Architettura Logica}
@@ -347,8 +223,9 @@ rilevi un ostacolo oppure giunga in prossimità dell'incrocio.
     \node[state] (disc) [right=of queue, xshift=1cm] {DISCOVER};%
     \path[->] (queue) edge [loop above] node[align=center]%
     {car\_mv/\_\\fault/no} ()%
-                      edge node {car\_mv/\_} (disc);%
+    edge node {car\_mv/\_} (disc);%
   \end{tikzpicture}
+  \caption{Stato \texttt{INQUEUE}.}                  
 \end{figure}
 
 L'evento \texttt{car\_mv} rappresenta l'avanzamento del veicolo lungo la sua
@@ -385,6 +262,7 @@ prossimità dello stesso incrocio. Viene quindi applicato il protocollo di
     edge node {wait/\_} (wait)%
     edge node {coord/\_} (slave);%
   \end{tikzpicture}
+  \caption{Stato \texttt{DISCOVER}.}                  
 \end{figure}
 Quando il veicolo entra nello stato \texttt{DISCOVER} invia il messaggio
 broadcast \texttt{disc}, che verrà ricevuto dai soli veicoli a portata wireless,
@@ -425,6 +303,7 @@ Eventuali messaggi ricevuti in questo stato vengo ignorati.
     \path[->] (disc) edge [bend left] node {wait/\_} (wait)%
               (wait) edge [bend left] node {wait\_tm/\_} (disc);
   \end{tikzpicture}
+  \caption{Stato \texttt{WAIT}.}                  
 \end{figure}
 
 \paragraph{\texttt{ELECTION}}
@@ -449,6 +328,7 @@ agli altri partecipanti.
     edge node {master/\_} (master)
     edge node {elect\_tm/\_} (disc);
   \end{tikzpicture}
+  \caption{Stato \texttt{ELECTION}.}                  
 \end{figure}
 
 Il veicolo in questo stato gestisce i seguenti eventi:
@@ -504,6 +384,7 @@ gestisce i seguenti eventi:
     edge node [xshift=0.6cm, yshift=0.2cm]{green/\_} (cross)
     edge node [align=center, xshift=-0.5cm, yshift=0.2cm]{red/\_\\slave\_tm/\_} (disc);
   \end{tikzpicture}
+  \caption{Stato \texttt{SLAVE}.}                  
 \end{figure}
 
 \paragraph{\texttt{MASTER}}
@@ -540,6 +421,7 @@ veicolo gestisce i seguenti eventi:
     edge node [xshift=0.6cm, yshift=0.2cm]{green/\_} (cross)
     edge node [xshift=-0.5cm, yshift=0.2cm]{red/\_} (disc);
   \end{tikzpicture}
+  \caption{Stato \texttt{MASTER}.}                  
 \end{figure}
 
 \paragraph{\texttt{CROSSING}} Il veicolo impegna l'incrocio secondo la sua rotta
@@ -562,6 +444,7 @@ questo stato.
     {car\_mv/\_\\disc/wait\\fault/no} ()%
     edge node {car\_mv/\_} (queue);%
   \end{tikzpicture}
+  \caption{Stato \texttt{CROSSING}.}                  
 \end{figure}
 
 
@@ -783,7 +666,7 @@ sequenza di alcune delle iterazioni tra i moduli descritte nella
 \Cref{sec:arclog}.
 
 
-\begin{figure}
+\begin{figure}[h]
 \centering
 \begin{tikzpicture}[node distance=3cm,
   font=\footnotesize\ttfamily\normalsize]
@@ -806,7 +689,7 @@ sequenza di alcune delle iterazioni tra i moduli descritte nella
   \label{fig:car_mv}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[h]
 \centering
 \begin{tikzpicture}[node distance=3cm,%>=stealth',
   font=\footnotesize\ttfamily\normalsize]
@@ -897,7 +780,7 @@ comunicano solo con l'environment.
   cerchioe/.style={circle,draw,minimum size=1.8cm,fill=white},
   cerchiov/.style={circle,draw,minimum size=1.4cm,fill=white}
 }
-\begin{figure}
+\begin{figure}[h]
   \centering
   \begin{tikzpicture}
     \coordinate (E) at (-11,5);
@@ -1042,15 +925,6 @@ locale atto a ricevere messaggi dai moduli \texttt{environment} e
 mostrate tre finestre: una con lo stato dell'incrocio, una per interagire con
 l'environment e una dove viene mostrato un log con le informazioni sui veicoli.
 
-% Details about the implementation: every choice about platforms, languages,
-% software/hardware, middlewares, which has not been decided in the
-% requirements.
-%
-%
-% Important choices about implementation should be described here; e.g.,
-% peculiar data structures.
-%
-
 \chapter{Validazione}
 Tutti i requisiti specificati nel \Cref{ch:analysis} sono stati soddisfatti. Il
 sistema è stato testato simulando la presenza costante di veicoli in prossimità
@@ -1063,12 +937,11 @@ da testare la \emph{fault-tolerance} del sistema.
 \begin{figure}
 \centering
 \includegraphics[width=\textwidth]{greenred}
-\caption{Esempio in cui i veicoli in prossimità dell'incrocio hanno ricevuto
-  messaggi \texttt{green} o \texttt{red}.}
+\caption{Interfaccia di monitoraggio: a sinistra lo stato globale dell'incrocio,
+  al centro i comandi di interazione e a destra le informazioni sui veicoli. I
+  veicoli in prossimità dell'incrocio hanno ricevuto messaggi \texttt{green} o
+  \texttt{red}.}
 \end{figure}
-
-%Check if requirements from Chapter~\ref{ch:analysis} have been fulfilled.
-%Quantitative tests (simulations) and screenshots of the interfaces are put here.
 
 
 \chapter{Conclusioni}
@@ -1094,11 +967,9 @@ sviluppo futuro può essere quello di scegliere un formato di descrizione
 dell'incrocio e quindi permettere di caricare nella simulazione diversi tipi di
 incroci.
 
-% What has been done with respect to what has been promised in Chapters~\ref{ch:intro} and \ref{ch:analysis}, and what is left out.
-
 \appendix
 
-\chapter{Appendix}
+\chapter{Istruzioni per l'esecuzione}
 
 Istruzioni per compilazione ed esecuzione della soluzione:
 \begin{enumerate}
@@ -1107,8 +978,8 @@ Istruzioni per compilazione ed esecuzione della soluzione:
 \item \texttt{\$ chmod +x start.sh} (se non lo è già, rendere eseguibile lo
   script start.sh)
 \end{enumerate}
-Eseguire lo script senza parametri o con opzione -h per verificare le possibili
-opzioni È necessario fornire i seguenti argomenti allo script:
+Eseguire lo script senza parametri o con opzione \texttt{-h} per verificare le
+possibili opzioni. I seguenti argomenti sono obbligatori:
 \begin{itemize}
 \item \texttt{-e <nome-nodo-erlang>}: indica la prima parte del nome del nodo
   erlang nel quale viene eseguito l'environment
@@ -1117,17 +988,17 @@ opzioni È necessario fornire i seguenti argomenti allo script:
 \end{itemize}
 
 Se, ad esempio, si desidera eseguire l'environment su una macchina utilizzando
-una scheda di rete con ip \texttt{192.168.1.100} è necessario lanciare il
+una scheda di rete con ip \texttt{192.168.1.100}, è necessario lanciare il
 seguente comando: \texttt{./start.sh -e envnode -i "192.168.1.100"}
 
-Se la creazione del nodo erlang va a buon fine viene avviata la GUI. Come nodo
-remoto e ip remoto inserire gli stessi parametri specificati sopra (nell'esempio
-\texttt{envnode} e \texttt{192.168.1.100}). Come nome del nodo locale è
-possibile scegliere una stringa a piacere. Come indirizzo ip locale viene invece
-proposto un menù a tendina dove sono elencati tutti gli ip che la macchina ha
-assegnati. Questo è l'indirizzo ip utilizzato dai veicoli e dall'environment per
-inviare informazioni alla GUI. Nell'esempio, selezionare il
-\texttt{192.168.1.100}.
+Se la creazione del nodo erlang va a buon fine viene avviata la GUI
+(\Cref{fig:gui-start}). Come nodo remoto e ip remoto inserire gli stessi
+parametri specificati sopra (nell'esempio \texttt{envnode} e
+\texttt{192.168.1.100}). Come nome del nodo locale è possibile scegliere una
+stringa a piacere. Come indirizzo ip locale viene invece proposto un menù a
+tendina dove sono elencati tutti gli ip che la macchina ha assegnati. Questo è
+l'indirizzo ip utilizzato dai veicoli e dall'environment per inviare
+informazioni alla GUI. Nell'esempio, selezionare il \texttt{192.168.1.100}.
 
 Una volta completati tutti i campi fare click su \emph{Start} per avviare
 l'interfaccia. Eventuali errori dovuti a nodi non raggiungibili o environment
@@ -1136,30 +1007,14 @@ a buon fine si apre l'interfaccia dalla quale gestire e monitorare
 l'applicativo.
 
 Chiudendo una qualsiasi delle finestre dell'interfaccia grafica, o inviando
-\texttt{CTRL-C} dalla shell si stoppa l'applicativo.
+\texttt{CTRL-C} dalla shell, si stoppa l'applicativo.
 
 \begin{figure}
 \centering
 \includegraphics[width=\textwidth]{guisetup}
 \caption{Schermata d'avvio.}
+\label{fig:gui-start}
 \end{figure}
-
-% In the Appendix you can put code snippets, snapshots, installation instructions, etc.
-
-
-%\chapter*{Evaluation}
-%Your system will be judged mainly on how it operates as a distributed system. The primary evaluation will be according to whether your system has the following attributes:
-%\begin{itemize}
-%\item  It should be an interesting distributed system, making use of some of the algorithms we have covered in class for distributed synchronization, replication, fault tolerance and recovery, security, etc.
-%\item The software should be well designed and well implemented, in terms of the overall architecture and the detailed realization.
-%\item You should devise and apply systematic testing procedures, at both the unit and systems levels.
-%\item The system should operate reliably and with good performance, even in the face of failures.
-%\end{itemize}
-%Important, but secondary considerations include:
-%\begin{itemize}
-%\item Time taken to do the project (the sooner the better, but do not miss details in order to end sooner)
-%\item  How nice is the application's appearance: does it have a nice interface or a compelling visual display?
-%\end{itemize}
 
 \end{document}
 
