@@ -1100,7 +1100,30 @@ incroci.
 
 \chapter{Appendix}
 
-Istruzioni installazione:
+Istruzioni per compilazione ed esecuzione della soluzione:
+\begin{enumerate}
+\item \texttt{\$ cd erlDIM} (da shell spostarsi all'interno della cartella di progetto)
+\item \texttt{\$ chmod +x start.sh} (se non lo è già, rendere eseguibile lo script start.sh)
+\end{enumerate}
+Eseguire lo script senza parametri o con opzione -h per verificare le possibili opzioni
+È necessario fornire i seguenti argomenti allo script:
+\begin{itemize}
+\item \texttt{-e <nome-nodo-erlang>}: indica la prima parte del nome del nodo erlang nel quale viene eseguito l'environment
+\item \texttt{-i <indirizzo-ip>}: indica la seconda parte del nome del nodo erlang nel quale viene eseguito l'environment.
+\end{itemize}
+
+Se, ad esempio, si desidera eseguire l'environment su una macchina utilizzando una scheda di rete con ip 192.168.1.100 è necessario lanciare il seguente comando:
+\texttt{./start.sh -e envnode -i "192.168.1.100"}
+
+
+Se la creazione del nodo erlang va a buon fine viene avviata la GUI. Come nodo remoto e ip remoto inserire gli stessi parametri specificati sopra (nell'esempio envnode e 192.168.1.100).
+Come nome del nodo locale è possibile scegliere una stringa a piacere. Come indirizzo ip locale viene invece proposto un menù a tendina dove sono elencati tutti gli ip che la macchina ha assegnati. Questo è l'indirizzo ip utilizzato dai veicoli e dall'environment per inviare informazioni alla GUI.
+Nell'esempio, selezionare il 192.168.1.100.
+
+Una volta completati tutti i campi fare click su Let's Go! per avviare l'interfaccia. Eventuali errori dovuti a nodi non raggiungibili o environment non avviato vengono segnalati.
+Se la fase di collegamento con il nodo remoto và a buon fine si apre l'interfaccia dalla quale gestire e monitorare l'applicativo.
+
+Chiudendo una qualsiasi delle finestre dell'interfaccia grafica, o inviando \texttt{CTRL-C} dalla shell si stoppa l'applicativo.
 
 % In the Appendix you can put code snippets, snapshots, installation instructions, etc.
 
