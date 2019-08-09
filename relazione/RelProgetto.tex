@@ -12,7 +12,8 @@
 \usepackage{minted}
 
 
-\title{Implementazione di un sistema di incrocio stradale intelligente \\ for the Project of Distributed Systems}
+\title{Implementazione di un Incrocio Stradale Intelligente\\per il Progetto di
+  Sistemi Distribuiti}
 
 \author{Tiziano Mele\\Valentino Picotti\\DMIF, University of Udine, Italy}
 
@@ -21,17 +22,15 @@
 \begin{document}
 
 
-%\begin{titlingpage}
 \maketitle
 \begin{abstract}
   Un sistema di incrocio stradale intelligente vuole essere una soluzione al
   problema della congestione stradale. Con l'avvento dei sistemi wireless e
   autonomici ci si chiede se sia possibile per i veicoli stradali poter decidere
   direttamente tra di loro chi debba impegnare l'incrocio. Di seguito si indaga
-  una soluzione che permatta di eliminare le lanterne semaforiche in modo da
+  una soluzione che permetta di eliminare le lanterne semaforiche in modo da
   ridurre i tempi medi di attesa dei veicoli in coda.
 \end{abstract}
-%\end{titlingpage}
 
 \chapter{Introduzione}\label{ch:intro}
 
@@ -40,15 +39,6 @@ distribuito, dove i singoli veicoli sono entità indipendenti e con conoscenza
 parziale dell'ambiente circostante data dalla sensoristica di bordo. Compito dei
 veicoli è quello di formare una rete peer-to-peer che permetta loro di
 comunicare autonomamente, senza bisogno di un server centrale.
-
-% TODO: Da riconsiderare per capitolo 3.1
-% Inoltre la soluzione mira ad essere fisicamente plausibile, ipotizzando un
-% deploy in una situazione reale (o mondo reale)
-% soluzione fisicamente plausibile
-% al funzionamento fisico della sensoristica
-% Molte scelte sono state effettuate pensando al livello tecnologico della
-% sensoristica ad oggi disponibile; ad esempio è stato tenuto conto del fatto che
-% i dispositivi wireless hanno un raggio di azione limitato.
 
 I principali requisiti che si vogliono soddisfare sono:
 \begin{description}
@@ -60,7 +50,7 @@ I principali requisiti che si vogliono soddisfare sono:
   limite entro cui le viene assegnato.
 \item[Deadlock freedom] Non possono verificarsi situazioni in cui nessuna
   macchina nell'incrocio può muoversi.
-\item [Fault Tolerant] Il sistema deve funzionare in caso di guasti fisici o
+\item [Fault Tolerance] Il sistema deve funzionare in caso di guasti fisici o
   logici. Un guasto fisico comporta che la macchina è attiva nella rete ma non
   può muoversi. Un guasto logico comporta che la macchina non è più
   raggiungibile nella rete, ma comunque presente fisicamente nell'ambiente.
@@ -77,25 +67,25 @@ Lo spazio fisico è partizionato in una griglia dove ogni macchina può occupare
 al più una cella. La griglia è poi rappresentata da un grafo orientato e pesato
 in cui i nodi rappresentano le singole celle della griglia. Si ha una collisione
 quando due auto vanno ad occupare la stessa cella nella griglia (lo stesso nodo
-del grafo). Le macchine sono dotate di sensori di prossimità, gps, e un modulo
+del grafo). Le macchine sono dotate di sensori di prossimità, gps e un modulo
 wifi per comunicare con le altre macchine. Una macchina può avanzare solo se il
-sensore di prossimità non rileva ostacoli e mediante il modulo gps la macchina è
-in grado di capire se si trova in prossimità di un incrocio. In quest'ultimo
-caso prima di avanzare deve coordinarsi con eventuali altre macchine presenti.
-Il coordinamento si traduce in una fase di elezione di un leader dell'incrocio,
-che poi deciderà quali macchine far passare.
+sensore di prossimità non rileva ostacoli ed è in grado di capire se si trova in
+prossimità di un incrocio mediante il modulo gps. In quest'ultimo caso prima di
+avanzare deve coordinarsi con eventuali altre macchine presenti. Il
+coordinamento si traduce in una fase di elezione di un leader dell'incrocio, che
+poi deciderà quali macchine far passare.
 
 
 Per testare il sistema è stato implementato un ambiente simulato le cui
 funzionalità rispecchino il più possibile quelle di un ambiente reale.
 
 \chapter{Analisi}\label{ch:analysis}
-In questo capitolo si descrivono requisi funzionali e non funzionali della
+In questo capitolo si descrivono requisiti funzionali e non funzionali della
 soluzione fornita.
 
 \section{Requisiti funzionali}
 
-Al fine di poter fornire una simulazione realistica sono stati individuati i
+Al fine di poter fornire una simulazione realistica, sono stati individuati i
 seguenti requisiti funzionali per gli attori che vi partecipano.
 
 \subsection{Veicolo}
@@ -104,16 +94,16 @@ Un veicolo deve soddisfate i seguenti requisiti funzionali:
 \begin{itemize}
 \item Muoversi in autonomia
 \item Poter interrogare i sensori di prossimità
-\item Conoscere la sua posione gps attuale e più in generale conoscere il suo
+\item Conoscere la sua posizione gps attuale e più in generale conoscere il suo
   intero tragitto
-\item Riconoscere se si trova in prossimatà di un incrocio, al suo interno o se
-  sta percorrendo un tratto senza incroci
+\item Riconoscere quando si trova in prossimità di un incrocio, al suo interno o
+  se sta percorrendo un tratto senza incroci
 \item Riconoscere eventuali macchine guaste che ostacolino il suo percorso
-\item Richiedere l'intervento del carro attrezzi per i veicoli che si suppone
+\item Richiedere l'intervento del carro attrezzi per i veicoli che suppone
   essere guasti
-\item Disporre di un meccanismi di comunicazione broadcast per poter comunicare
+\item Disporre di un meccanismo di comunicazione broadcast per poter comunicare
   con le auto nelle vicinanze
-\item Disporre di un meccasnismo di comunicazione unicast che permetta di
+\item Disporre di un meccanismo di comunicazione unicast che permetta di
   comunicare con una singola auto
 \item Essere in grado di coordinarsi con gli altri veicoli per attraversare
   l'incrocio
@@ -121,7 +111,7 @@ Un veicolo deve soddisfate i seguenti requisiti funzionali:
 
 \subsection{Ambiente}
 
-L'ambiete è l'unico attore che dispone della conoscenza globale dell'incrocio,
+L'ambiente è l'unico attore che dispone della conoscenza globale dell'incrocio,
 compresa la posizione esatta di ogni auto. Deve quindi soddisfare i seguenti
 requisiti:
 \begin{itemize}
@@ -133,19 +123,19 @@ requisiti:
   intervento da parte di un veicolo
 \end{itemize}
 
-La struttara dell'incrocio oltre che fornire una descrizione topologica e
-spaziale deve anche indicare le traittorie di percorrenza ammesse. Tale
+La struttura dell'incrocio oltre che fornire una descrizione topologica e
+spaziale deve anche indicare le traiettorie di percorrenza ammesse. Tale
 struttura la si considera come dato di input della simulazione.
 
 \subsection{Interfaccia grafica}
 
 La soluzione prevede la presenza di un interfaccia grafica dalla quale è
-possibile visualizzare ad ongi istante lo stato dell'incrocio per monitorarne il
+possibile visualizzare ad ogni istante lo stato dell'incrocio per monitorarne il
 funzionamento e aggiungere nuovi veicoli alla simulazione.
 
 
 \section{Requisiti non funzionali}
-I requisiti non funzionali che una soluzion deve soddisfare sono:
+I requisiti non funzionali che una soluzione deve soddisfare sono:
 \begin{description}
 \item[Sicurezza stradale] Le auto che attraversano l'incrocio non devono
   scontrarsi.
@@ -179,122 +169,6 @@ Inoltre la soluzione soddisfa le seguenti trasparenza:
   posizione del leader, che può essere uno qualsiasi fra i veicoli presenti.
 \end{description}
 
-
-\newpage
-
-Come primo passaggio viene creato un processo "environment" dove viene salvato
-lo stato globale dell'incrocio. L'incrocio viene tradotto in un grafo orientato
-pesato, dove ogni nodo conterrà le seguenti informazioni:
-\begin{itemize}
-\item Nome
-\item Tipologia di nodo: TailNode(Nodo in coda) TopNode (Nodo in prossimità di
-  un incrocio) CrossNode(Nodo incrocio)
-\item Elenco di macchine che occupano il nodo stesso
-\end{itemize}
-Il peso degli archi del grafo viene assegnato in base alla distanza fisica tra i
-due nodi.
-Questo modulo viene interrogato dalle varie macchine per simulare dati relativi
-alla sensoristica.
-
-Ogni veicolo sarà implementato come un processo che quindi potrà interrogare i
-sensori per ottenere le informazioni su posizione, ostacoli, percorso più breve
-verso la sua destinazione.
-
-Le macchine sono in relazione client-server con l'environment. Ogni automobile è
-una macchina a stati finiti per la quale si prevede di utilizzare il behaviour
-di erlang gen\_statem. Gli stati principali per un veicolo sono:
-\begin{itemize}
-\item \texttt{INQUEQUE}: La macchina si trova in questo stato quando è in coda
-  (non è la prima macchina della fila)
-\item \texttt{DISCOVER}: La macchina è la prima della file. In questo stato la
-  macchina manda un broadcast per scoprire le auto vicine.
-\item \texttt{ELECTION}: La macchina è la prima della fila. E' in corso
-  l'elezione di un leader dell'incrocio
-\item \texttt{SLAVE}: L'elezione si è conclusa e la macchina non è leader. Mando
-  il mio percorso al leader e attendo risposta "verde"/"rosso".
-\item \texttt{M-FETCH}: La macchina è stata eletta leader dell'incrocio. Attendo
-  i percorsi delle macchine SLAVE.
-\item \texttt{M-COORD}: In base ai percorsi e alle priorità delle macchine mando
-  messaggi "verde"/"rosso" agli SLAVE.
-\item \texttt{CROSSING}: La macchina è in questo stato se si trova su un nodo
-  del grafo di tipo CrossNode.
-\item \texttt{PH-FAULT}: La macchina ha un guasto fisico.
-\end{itemize}
-
-Ogni veicolo può ricevere uno dei seguenti eventi:
-\begin{itemize}
-\item \texttt{disc}: La macchina è appena arrivata in prossimità dell'incrocio e
-  manda in broadcast un "discover" con il suo pid e il suo percorso. A livello
-  pratico per simulare il broadcast il messaggio di discover viene mandato
-  all'environment che poi rigira alle altre macchine. Queste quindi a loro volta
-  mandano un messaggio di "hellofrom" alla nuova macchina (con il loro
-  percorso).
-\item \texttt{disc\_tm}: lo stato \texttt{DISCOVER} ha un suo timeout. Una volta
-  trascorso viene innescato questo evento.
-\item \texttt{wait(tag:*)}: se la macchina si trova in stato \texttt{DISCOVER} e
-  riceve questo evento rimane nello stato \texttt{DISCOVER} e resetta il
-  timeout.
-\item \texttt{hello(pid)}: se la macchina si trova in stato \texttt{DISCOVER},
-  mi salvo il pid ricevuto tra i conosciuti.
-\item \texttt{elect}: Messaggio di \emph{election} dell'algoritmo bully.
-\item \texttt{coord}: Messaggio di \emph{coordinator} dell'algoritmo bully.
-\item \texttt{ans}: Messaggio di \emph{answer} dell'algoritmo bully.
-\item \texttt{elect\_tm}: Evento di timeout (elezione fallita) dell'algoritmo bully.
-\item \texttt{route}: messaggio contenente id, priorità, lista macchine con cui
-  è in conflitto.
-\item \texttt{route\_tm}: evento di timeout per lo stato \texttt{M-FETCH}.
-\item \texttt{green}: Messaggio che notifica a macchina in stato \texttt{SLAVE}
-  che può attraversare incrocio.
-\item \texttt{red}: Messaggio che notifica a macchina in stato \texttt{SLAVE}
-  che non può attraversare incrocio.
-\item \texttt{gr\_timeout}: evento di timeout per lo stato \texttt{SLAVE} e
-  \texttt{M-COORD}.
-\end{itemize}
-
-\begin{figure}
-  \centering
-  \begin{tikzpicture}[shorten >=1pt, node distance=2.5cm,on grid,auto, bend
-    angle=30, font=\footnotesize\ttfamily]
-    \node[state,initial] (queue) {INQUEUE};%
-    \node[state] (disc) [right=of queue] {DISCOVER};%
-    \node[state] (elec) [right=of disc,xshift=0.5cm] {ELECTION};%
-    \node[state] (slave) [xshift=1cm,above right=of elec] {SLAVE};%
-    \node[state] (m-fetch) [xshift=1cm,below right=of elec] {M-FETCH};%
-    \node[state] (m-coord) [right=of m-fetch,xshift=0.5cm] {M-COORD};%
-    \node[state] (cross) [above right=of m-coord] {CROSSING};%
-    \node[state,initial,initial text=fault] (fault) [below=of disc]
-    {PH-FAULT};%
-    \path[->]%
-    (queue) edge node {on\_top} (disc)%
-    (disc) edge [loop above] node[xshift=-0.2cm] {disc,hello,wait} ()%
-    edge node {disc\_tm} (elec)%
-    edge [bend right] node[yshift=-0.5cm] {elec} (elec)%
-    edge [bend left] node[yshift=0.1cm,xshift=0.7cm] {coord} (slave)%
-    (elec) edge [loop below] node {disc,elect,ans} ()%
-    edge node {coord} (slave)%
-    edge [bend right] node[yshift=0.45cm] {elec\_tm} (disc)%
-    edge node[xshift=-0.4cm,yshift=0.2cm] {master} (m-fetch)%
-    (slave) edge [loop
-    above] node {disc} () edge node {green} (cross) edge [bend right=50]
-          node[xshift=-0.5cm,yshift=0.7cm] {red,gr\_tm} (disc) (m-fetch) edge
-          [loop above] node {route,disc} () edge node {route\_tm} (m-coord)
-          (m-coord) edge [loop above] node {disc,route} () edge [below] node
-          [xshift=0.5cm] {green} (cross) edge [bend left=50] node {red,gr\_tm}
-          (disc) (cross) edge [loop above] node {disc} ();
- \end{tikzpicture}
- \caption{Car: Finite State Machine}
-\end{figure}
-
-Ogni veicolo ha un suo valore di priorità iniziale, che viene incrementato ogni
-volta che il veicolo riceve il messaggio \texttt{red} (lo può ricevere solo se è
-in stato \texttt{SLAVE} o \texttt{M-COORD}). Il leader dell'incrocio decide chi
-far passare nel seguente modo:
-\begin{itemize}
-\item Ordina le macchine per priorità;
-\item Farà sicuramente passare la prima.
-\item Calcola un insieme massimale di macchine indipendenti rispetto alla prima
-\end{itemize}
-
 \chapter{Progetto}
 
 \section{Architettura Logica}
@@ -303,8 +177,9 @@ Le componenti principali della soluzione sono:
 \begin{itemize}
 \item Modulo Veicolo: utilizzato per rappresentare il singolo veicolo;
 \item Modulo Environment: utilizzato per rappresentare l'ambiente e simulare
-  interazione del veicolo con la sensoristica;
-\item Interfaccia grafica: modulo utilizzato per monitorare e interagire con l'ambiente
+  l'interazione del veicolo con la sensoristica;
+\item Interfaccia grafica: modulo utilizzato per monitorare e interagire con
+  l'ambiente.
 \end{itemize}
 
 Di seguito vengono descritte nel dettaglio le funzionalità implementate da ogni componente
@@ -317,16 +192,16 @@ messaggi inviati. Gli stati principali per un veicolo sono:
 \item \texttt{INQUEUE}: Il veicolo si trova in questo stato quando stà
   transitando in una zona non in prossimità di un incrocio;
 \item \texttt{DISCOVER}: Il veicolo si trova in prossimità di un incrocio e deve
-  effettuare il \emph{discover} delle auto nelle vicinanze
-\item \texttt{WAIT}: Il veicolo deve attendere il completamento di un elezione
-  già in corso o il transito di altri veicoli nell'incrocio.
-\item \texttt{ELECTION}: Il veicolo si trova in prossimità di un incrocio. E' in
-  corso l'elezione di un leader dell'incrocio
-\item \texttt{SLAVE}: L'elezione si è conclusa e il veicolo non è leader, quindi
-  resta in attesa di istruzioni da parte del leader;
-\item \texttt{MASTER}: Il veicolo è stato eletto leader dell'incrocio, e quindi
-  procede inviando istruzioni ai veicoli SLAVE;
-\item \texttt{CROSSING}: Il veicolo stà impegnando l'incrocio;
+  effettuare il \emph{discover} delle auto nelle vicinanze;
+\item \texttt{WAIT}: Il veicolo deve attendere il completamento di un'elezione
+  già in corso o il transito di altri veicoli nell'incrocio;
+\item \texttt{ELECTION}: Il veicolo si trova in prossimità di un incrocio e sta
+  partecipando all'elezione di un leader;
+\item \texttt{SLAVE}: L'elezione si è conclusa e il veicolo non è leader. Rimane
+  quindi in attesa di istruzioni da parte del leader;
+\item \texttt{MASTER}: Il veicolo è stato eletto leader dell'incrocio, quindi
+  procede inviando istruzioni ai veicoli \texttt{SLAVE};
+\item \texttt{CROSSING}: Il veicolo sta percorrendo l'incrocio;
 \item \texttt{PH-FAULT}: Il veicolo ha rilevato un guasto fisico. Un guasto
   fisico può avvenire in un qualsiasi momento.
 \end{itemize}
@@ -338,7 +213,7 @@ di tali eventi. Gli eventi non menzionati in un certo stato vanno ignorati.
 \paragraph{\texttt{INQUEUE}}
 Il veicolo avanza di una cella nello spazio fisico ogni \emph{n} secondi
 seguendo la sua rotta e rallentando nel caso in cui il sensore di prossimità
-rilevi un ostacolo oppure si arrivi in prossimità dell'incrocio.
+rilevi un ostacolo oppure giunga in prossimità dell'incrocio.
 
 \begin{figure}[h]
   \centering
@@ -348,8 +223,9 @@ rilevi un ostacolo oppure si arrivi in prossimità dell'incrocio.
     \node[state] (disc) [right=of queue, xshift=1cm] {DISCOVER};%
     \path[->] (queue) edge [loop above] node[align=center]%
     {car\_mv/\_\\fault/no} ()%
-                      edge node {car\_mv/\_} (disc);%
+    edge node {car\_mv/\_} (disc);%
   \end{tikzpicture}
+  \caption{Stato \texttt{INQUEUE}.}                  
 \end{figure}
 
 L'evento \texttt{car\_mv} rappresenta l'avanzamento del veicolo lungo la sua
@@ -358,8 +234,8 @@ prossimità: se vi sono ostacoli, il veicolo si ferma in attesa di un nuovo
 evento \texttt{car\_mv}; se la strada è libera procede con la sua corsa fino ad
 occupare la cella successiva nella griglia. A questo punto, se la nuova cella
 risulta essere in prossimità di un incrocio, il veicolo entra nello stato
-\texttt{DISCOVER}, altrimenti rimane nello stesso stato in attesa di un nuovo
-evento \texttt{car\_mv}.
+\texttt{DISCOVER}, altrimenti rimane nello stato \texttt{INQUEUE} in attesa di
+un nuovo evento \texttt{car\_mv}.
 
 Se il veicolo rileva un ostacolo che lo obbliga a una fermata prolungata, avvia
 una chiamata al soccorso stradale in merito alla posizione dell'ostacolo. Sarà
@@ -386,6 +262,7 @@ prossimità dello stesso incrocio. Viene quindi applicato il protocollo di
     edge node {wait/\_} (wait)%
     edge node {coord/\_} (slave);%
   \end{tikzpicture}
+  \caption{Stato \texttt{DISCOVER}.}                  
 \end{figure}
 Quando il veicolo entra nello stato \texttt{DISCOVER} invia il messaggio
 broadcast \texttt{disc}, che verrà ricevuto dai soli veicoli a portata wireless,
@@ -426,6 +303,7 @@ Eventuali messaggi ricevuti in questo stato vengo ignorati.
     \path[->] (disc) edge [bend left] node {wait/\_} (wait)%
               (wait) edge [bend left] node {wait\_tm/\_} (disc);
   \end{tikzpicture}
+  \caption{Stato \texttt{WAIT}.}                  
 \end{figure}
 
 \paragraph{\texttt{ELECTION}}
@@ -450,6 +328,7 @@ agli altri partecipanti.
     edge node {master/\_} (master)
     edge node {elect\_tm/\_} (disc);
   \end{tikzpicture}
+  \caption{Stato \texttt{ELECTION}.}                  
 \end{figure}
 
 Il veicolo in questo stato gestisce i seguenti eventi:
@@ -505,6 +384,7 @@ gestisce i seguenti eventi:
     edge node [xshift=0.6cm, yshift=0.2cm]{green/\_} (cross)
     edge node [align=center, xshift=-0.5cm, yshift=0.2cm]{red/\_\\slave\_tm/\_} (disc);
   \end{tikzpicture}
+  \caption{Stato \texttt{SLAVE}.}                  
 \end{figure}
 
 \paragraph{\texttt{MASTER}}
@@ -541,6 +421,7 @@ veicolo gestisce i seguenti eventi:
     edge node [xshift=0.6cm, yshift=0.2cm]{green/\_} (cross)
     edge node [xshift=-0.5cm, yshift=0.2cm]{red/\_} (disc);
   \end{tikzpicture}
+  \caption{Stato \texttt{MASTER}.}                  
 \end{figure}
 
 \paragraph{\texttt{CROSSING}} Il veicolo impegna l'incrocio secondo la sua rotta
@@ -563,6 +444,7 @@ questo stato.
     {car\_mv/\_\\disc/wait\\fault/no} ()%
     edge node {car\_mv/\_} (queue);%
   \end{tikzpicture}
+  \caption{Stato \texttt{CROSSING}.}                  
 \end{figure}
 
 
@@ -578,7 +460,7 @@ dall'evento \texttt{ph\_fault} che obbliga il veicolo ad entrare nello stato
 Si riportano di seguito le API pubbliche dell'ambiente che è possibile
 richiamare dall'esterno:
 \begin{itemize}
-\item \texttt{broadcast\_disc}: funzione richiamata da un veicolo per simulare
+\item \texttt{broadcast\_msg}: funzione richiamata da un veicolo per simulare
   un messaggio broadcast. La funzione calcola le auto che si trovano a portata
   wireless del veicolo e quindi inoltra il messaggio.
 \item \texttt{req\_prox\_sensor\_data}: funzione utilizzata dal veicolo per
@@ -586,10 +468,10 @@ richiamare dall'esterno:
   presente o meno un veicolo nella posizione richiesta, quindi inoltra l'esito
   al veicolo. Nota: non viene controllato lo stato del veicolo che potrebbe
   essere quindi anche in guasto fisico o logico.
-\item \texttt{notify\_move}: funzione utilizzata dal veicolo per avvisare
-  l'ambiente che si è mosso. La funzione provvede ad aggiornare lo stato globale
-  dell’incrocio. Una volta concluse tutte le operazioni viene inviato il nuovo
-  stato globale all’interfaccia grafica.
+\item \texttt{notify\_move}: funzione utilizzata da un veicolo per notificare
+  l'ambiente che è avanzato di una posizione. La funzione provvede ad aggiornare
+  lo stato globale dell’incrocio. Una volta concluse tutte le operazioni viene
+  inviato il nuovo stato globale all’interfaccia grafica.
 \item \texttt{spawn\_car}: funzione utilizzata per inserire un nuovo veicolo
   nella simulazione. Viene utilizzata principalmente dall'interfaccia grafica.
   Una volta concluse tutte le operazioni viene inviato il nuovo stato globale
@@ -601,7 +483,7 @@ richiamare dall'esterno:
   all’interfaccia grafica.
 \item \texttt{request\_towtruck}: funzione utilizzata dai veicoli per richiedere
   l'intervento del carro attrezzi. La funzione verifica se il veicolo segnalato
-  sia effettivamente guasto, e in caso positivo provvede a rimuoverlo
+  sia effettivamente guasto e, in caso positivo, provvede a rimuoverlo
   dall’ambiente. I guasti logici vengono rilevati mediante un timeout: se il
   veicolo non risponde alla richiesta entro un determinato intervallo di tempo
   viene considerato in guasto logico. Una volta concluse tutte le operazioni
@@ -647,7 +529,7 @@ tutti gestiti in maniera asincrona:
   l'identità del veicolo mittente e la sua rotta.
 \item \texttt{hello}: messaggio unicast inviato in risposta ad un \texttt{disc}
   dai soli veicoli in stato \texttt{DISCOVER}. Il payload deve contenere
-  l'identità del veicolo mittente e la sua rotta.
+  l'identità del mittente e la sua rotta.
 \item \texttt{wait}: messaggio unicast inviato in risposta ad un \texttt{disc}
   dai veicoli in stato \texttt{ELECTION}, \texttt{MASTER}, \texttt{SLAVE} o
   \texttt{CROSSING}. Il payload non contiene alcuna informazione.
@@ -736,11 +618,11 @@ L'algoritmo gestisce elezioni indette simultaneamente da più veicoli e eventual
 fallimenti in fase di elezione.
 
 \subsection{Algoritmo Maximal Indipendent Set}
-Una volta conclusa la fase di elezione il leader riceve una serie di messaggi
-\texttt{conflict} da parte degli slave, contenenti identità e priorità del
-mittente e una lista dei veicoli con cui il mittente stesso è in conflitto. A
-questo punto il leader ha le informazioni necessarie per calcolare un insieme di
-macchine le cui rotte non sono in conflitto.
+Una volta conclusa la fase di elezione, il leader riceve da parte degli slave
+una serie di messaggi \texttt{conflict} ciascuno contenente l'identità e la
+priorità del mittente e la lista dei veicoli con cui il mittente stesso è in
+conflitto. A questo punto il leader ha le informazioni necessarie per scegliere
+un insieme di macchine le cui rotte non siano in conflitto.
 
 Costruendo un grafo dei conflitti, i cui nodi corrispondono ai veicoli e i cui
 archi rappresentano un conflitto nelle rotte, è sufficiente trovare un insieme
@@ -753,12 +635,12 @@ che presi a due a due non sono adiacenti, ovvero
 
 Al fine di massimizzare l'utilizzo della risorsa (l'incrocio) si vorrebbe
 trovare l'insieme massimo di vertici indipendenti, tuttavia, oltre ad essere un
-problema NP-Completo, non è compatibile con il requisito di \emph{fairness}. Si
-è quindi deciso di optare per un algoritmo che si limiti a calcolare un insieme
-massimale $I$, ma che tenga conto del tempo di attesa dei veicoli. Il leader
-invia quindi il messaggio \texttt{green} ai veicoli in $I$ e il messaggio
-\texttt{red} ai restanti. Di seguito la descrizione dell'algoritmo in
-pseudo-codice:
+problema \emph{NP-Completo}, non è compatibile con il requisito di
+\emph{fairness}. Si è quindi deciso di optare per un algoritmo che si limiti a
+calcolare un insieme massimale $I$, ma che tenga conto del tempo di attesa dei
+veicoli. Il leader invia quindi il messaggio \texttt{green} ai veicoli in $I$ e
+il messaggio \texttt{red} ai restanti. Di seguito la descrizione dell'algoritmo
+in pseudo-codice:
 
 \begin{algorithm}
 \SetKwFunction{Sort}{sort\_by\_priority}
@@ -784,7 +666,7 @@ sequenza di alcune delle iterazioni tra i moduli descritte nella
 \Cref{sec:arclog}.
 
 
-\begin{figure}
+\begin{figure}[h]
 \centering
 \begin{tikzpicture}[node distance=3cm,
   font=\footnotesize\ttfamily\normalsize]
@@ -807,7 +689,7 @@ sequenza di alcune delle iterazioni tra i moduli descritte nella
   \label{fig:car_mv}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[h]
 \centering
 \begin{tikzpicture}[node distance=3cm,%>=stealth',
   font=\footnotesize\ttfamily\normalsize]
@@ -898,7 +780,7 @@ comunicano solo con l'environment.
   cerchioe/.style={circle,draw,minimum size=1.8cm,fill=white},
   cerchiov/.style={circle,draw,minimum size=1.4cm,fill=white}
 }
-\begin{figure}
+\begin{figure}[h]
   \centering
   \begin{tikzpicture}
     \coordinate (E) at (-11,5);
@@ -943,11 +825,11 @@ comunicano solo con l'environment.
     \draw[{Latex}-{Latex},shorten >=0.7cm, shorten <=0.9cm,thick] (Env) -- (F);
     \draw[{Latex}-{Latex},shorten >=0.9cm, shorten <=0.9cm,draw=purple!70,thick,dashed] (Env) -- (Gui);
   \end{tikzpicture}
-  \caption{Architettura fisica}
+  \caption{Architettura fisica.}
   \label{fig:arcfis}
 \end{figure}
 
-\chapter{Implementation}
+\chapter{Implementazione}
 
 I linguaggi scelti per l'implementazione della soluzione sono Erlang (versione
 Erlang/OTP 22) per i moduli \emph{Vehicle} ed \emph{Environment}, e Java 1.8 per
@@ -961,7 +843,7 @@ invece del pid del processo.
 
 \subsection{Environment}
 Il processo environment è il primo ad essere avviato, mediante la funzione
-\texttt{go/0}. All'avvio vengono create e inizializzate le strutture dati
+\texttt{start/0}. All'avvio vengono create e inizializzate le strutture dati
 necessarie a descrivere lo stato globale dell'incrocio. Per rappresentare
 l'incrocio vengono creati due grafi pesati identici, uno orientato e uno non
 orientato. I nodi del grafo corrispondono alle celle della griglia in cui è
@@ -970,16 +852,16 @@ peso degli archi viene assegnato in base alla distanza fisica tra le celle. Il
 grafo orientato descrive i sensi di marcia delle corsie, ed è utilizzato per
 calcolare la rotta di un veicolo come cammino minimo tra nodo di partenza e
 destinazione. Il grafo non orientato è invece utilizzato per salvare la
-posizione dei veicoli, effettuare query prossimità e per individuare veicoli a
-portata wireless (necessario ad esempio per simulare un messaggio \texttt{disc}
-in broadcast). Ogni nodo del grafo non orientato contiene le seguenti
-informazioni:
+posizione dei veicoli, effettuare query di prossimità e per individuare veicoli
+a portata wireless (necessario ad esempio per simulare un messaggio
+\texttt{disc} in broadcast). Ogni nodo del grafo non orientato contiene le
+seguenti informazioni:
 \begin{itemize}
-\item Nome: atomo Erlang;
-\item Tipologia di nodo: atomo Erlang usato per distinguere nodi normali, in
-  prossimità di un incrocio, in incrocio, in uscita da incrocio. Può assumere i
-  seguenti 3 valori: \texttt{tail\_node}, \texttt{top\_node},
-  \texttt{cross\_node}, \texttt{out\_node};
+\item Nome: atomo Erlang.
+\item Tipologia di nodo: atomo Erlang utilizzato per distinguere fra nodi
+  normali (\texttt{tail\_node}), nodi in prossimità di un incrocio
+  (\texttt{top\_node}), nodi al centro dell'incrocio (\texttt{cross\_node}) e
+  nodi in uscita dall'incrocio (\texttt{out\_node}).
 \item Veicoli presenti nel nodo: lista Erlang contenente gli identificativi dei
   veicoli.
 \end{itemize}
@@ -988,13 +870,12 @@ I grafi sono stati implementati con la libreria
 che è essenzialmente un wrapper del modulo \texttt{digraph} della libreria
 standard di Erlang. È stata scelta tale libreria in quanto era già presente
 un'implementazione dell'algoritmo del cammino minimo (Dijkstra) per grafi
-pesati. Il processo environment è stato implementato utilizzando behaviour
-erlang \texttt{gen\_server}, e quindi è stato sufficiente implementare le
-funzioni \texttt{handle\_call} e \texttt{handle\_cast} per gestire
-rispettivamente messaggi sincroni e asincroni, lasciando al behaviour la
-gestione del main loop. Per inviare messaggi al processo environment è
-necessario utilizzare le funzioni \texttt{gen\_server:call} e
-\texttt{gen\_server:cast} esposte dal behaviour.
+pesati. Il processo environment è stato implementato utilizzando il behaviour
+erlang \texttt{gen\_server}, quindi è stato sufficiente implementare le funzioni
+\texttt{handle\_call} e \texttt{handle\_cast} per gestire rispettivamente
+messaggi sincroni e asincroni, lasciando al behaviour la gestione del main loop.
+Per inviare messaggi al processo environment è necessario utilizzare le funzioni
+\texttt{gen\_server:call} e \texttt{gen\_server:cast} esposte dal behaviour.
 
 Come esempio di gestione di un messaggio asicrono si riporta l'implementazione
 della richiesta di broadcast da parte di un veicolo. Il veicolo richiama la
@@ -1012,46 +893,128 @@ handle_cast({broadcast, Msg={FromCar, _Route}}, W) ->
   {noreply, W};
 \end{minted}
 
-%% TODO: implementazione veicolo (parlare di gen statem) e GUI
-\newpage
+\subsection{Vehicle}
+Una volta che il processo \texttt{environment} è stato avviato è possibile
+procedere con lo spawn di nuovi veicoli tramite la funzione
+\texttt{dim\_env:spawn\_car(CarName, CarDesc, StartPos, EndPos, Speed, Prio,
+  FaultProb)}. I parametri sono:
+\begin{itemize}
+\item \texttt{CarName}: atomo utilizzato per registrare il processo. Viene
+  utilizzato il nome del veicolo per comunicare con quest'ultimo.
+\item \texttt{StartPos}: posizione di partenza del veicolo.
+\item \texttt{EndPos}: destinazione che il veicolo desidera raggiungere.
+\item \texttt{Speed}: periodo di tempo espresso in millisecondi che il veicolo
+  attende prima di tentare di avanzare nuovamente.
+\item \texttt{Prio}: priorità iniziale del veicolo. Veicoli speciali possono
+  partire con un livello di priorità maggiore degli altri.
+\item \texttt{FaultProb}: probabilità di guasto fisico o logico del veicolo.
+  Questo parametro è stato introdotto per simulare un guasto fisico o logico.
+\end{itemize}
+Il processo \texttt{vehicle} è stato implementato utilizzato il behaviour erlang
+\texttt{gen\_statem}, quindi è stato implementato come la macchina a stati
+finiti descritta nella \Cref{sec:arclog}.
+
+\subsection{Interfaccia Grafica}
+L'interfaccia grafica è stata scritta in java e si appoggia alla libreria
+\texttt{jinterface} per ricevere ed inviare messaggi ai processi erlang.
+All'avvio dell'interfaccia viene mostrato un form dove poter inserire nome e
+indirizzo ip del nodo erlang dove il processo \texttt{environment} è stato
+avviato. Viene inoltre richiesto di inserire il nome da dare al nodo erlang
+locale atto a ricevere messaggi dai moduli \texttt{environment} e
+\texttt{vehicle}. Se la connessione con il nodo remoto va a buon fine, vengono
+mostrate tre finestre: una con lo stato dell'incrocio, una per interagire con
+l'environment e una dove viene mostrato un log con le informazioni sui veicoli.
+
+\chapter{Validazione}
+Tutti i requisiti specificati nel \Cref{ch:analysis} sono stati soddisfatti. Il
+sistema è stato testato simulando la presenza costante di veicoli in prossimità
+dell'incrocio utilizzando la funzionalità dell'interfaccia \emph{AutoSpawn}.
+Tale funzionalità effettua lo spawn di veicoli con rotta casuale ogni secondo,
+assicurando che le vie di accesso all'incrocio siano sempre trafficate. Inoltre
+dall'interfaccia è possibile impostare la probabilità di fault dei veicoli così
+da testare la \emph{fault-tolerance} del sistema.
+
+\begin{figure}
+\centering
+\includegraphics[width=\textwidth]{greenred}
+\caption{Interfaccia di monitoraggio: a sinistra lo stato globale dell'incrocio,
+  al centro i comandi di interazione e a destra le informazioni sui veicoli. I
+  veicoli in prossimità dell'incrocio hanno ricevuto messaggi \texttt{green} o
+  \texttt{red}.}
+\end{figure}
 
 
-Details about the implementation: every choice about platforms, languages, software/hardware, middlewares, which has not been decided in the requirements.
+\chapter{Conclusioni}
+La soluzione fornita implementa un sistema distribuito che risolve il problema
+dell'incrocio intelligente. Nella soluzione è prevista una fase di elezione di
+un leader dell'incrocio, il quale poi deciderà quali veicoli far passare.
+L'algoritmo utilizzato per il coordinamento è tale da rendere la soluzione
+\emph{deadlock-free} e \emph{fair}. Di default i veicoli normali partono tutti
+con la stessa priorità iniziale. È possibile modellare veicoli speciali che
+abbiano precedenza sugli altri (ad esempio ambulanze) semplicemente variando la
+priorità iniziale.
 
+Il sistema gestisce i casi di guasti dei veicoli: un possibile veicolo in panne
+viene segnalato dai veicoli in coda chiamando il carro attrezzi. La sicurezza
+stradale è garantita dalla presenza dei sensori di prossimità: un guasto di
+questi ultimi è gestito come un guasto fisico; si suppone che non ci siano fault
+bizantini.
 
-Important choices about implementation should be described here; e.g., peculiar data structures.
-
-
-\chapter{Validation}
-
-Check if requirements from Chapter~\ref{ch:analysis} have been fulfilled.
-Quantitative tests (simulations) and screenshots of the interfaces are put here.
-
-
-\chapter{Conclusions}
-
-What has been done with respect to what has been promised in Chapters~\ref{ch:intro} and \ref{ch:analysis}, and what is left out.
+Il sistema è stato implementato senza fare assunzioni sulla tipologia di
+incrocio, tuttavia è stato testato solo con l'incrocio mostrato durante la
+simulazione, la cui descrizione è definita all'interno del codice. Un possibile
+sviluppo futuro può essere quello di scegliere un formato di descrizione
+dell'incrocio e quindi permettere di caricare nella simulazione diversi tipi di
+incroci.
 
 \appendix
 
-\chapter{Appendix}
+\chapter{Istruzioni per l'esecuzione}
 
-In the Appendix you can put code snippets, snapshots, installation instructions, etc.
-
-
-\chapter*{Evaluation}
-Your system will be judged mainly on how it operates as a distributed system. The primary evaluation will be according to whether your system has the following attributes:
+Istruzioni per compilazione ed esecuzione della soluzione:
+\begin{enumerate}
+\item \texttt{\$ cd erlDIM} (da shell spostarsi all'interno della cartella di
+  progetto)
+\item \texttt{\$ chmod +x start.sh} (se non lo è già, rendere eseguibile lo
+  script start.sh)
+\end{enumerate}
+Eseguire lo script senza parametri o con opzione \texttt{-h} per verificare le
+possibili opzioni. I seguenti argomenti sono obbligatori:
 \begin{itemize}
-\item  It should be an interesting distributed system, making use of some of the algorithms we have covered in class for distributed synchronization, replication, fault tolerance and recovery, security, etc.
-\item The software should be well designed and well implemented, in terms of the overall architecture and the detailed realization.
-\item You should devise and apply systematic testing procedures, at both the unit and systems levels.
-\item The system should operate reliably and with good performance, even in the face of failures.
+\item \texttt{-e <nome-nodo-erlang>}: indica la prima parte del nome del nodo
+  erlang nel quale viene eseguito l'environment
+\item \texttt{-i <indirizzo-ip>}: indica la seconda parte del nome del nodo
+  erlang nel quale viene eseguito l'environment.
 \end{itemize}
-Important, but secondary considerations include:
-\begin{itemize}
-\item Time taken to do the project (the sooner the better, but do not miss details in order to end sooner)
-\item  How nice is the application's appearance: does it have a nice interface or a compelling visual display?
-\end{itemize}
+
+Se, ad esempio, si desidera eseguire l'environment su una macchina utilizzando
+una scheda di rete con ip \texttt{192.168.1.100}, è necessario lanciare il
+seguente comando: \texttt{./start.sh -e envnode -i "192.168.1.100"}
+
+Se la creazione del nodo erlang va a buon fine viene avviata la GUI
+(\Cref{fig:gui-start}). Come nodo remoto e ip remoto inserire gli stessi
+parametri specificati sopra (nell'esempio \texttt{envnode} e
+\texttt{192.168.1.100}). Come nome del nodo locale è possibile scegliere una
+stringa a piacere. Come indirizzo ip locale viene invece proposto un menù a
+tendina dove sono elencati tutti gli ip che la macchina ha assegnati. Questo è
+l'indirizzo ip utilizzato dai veicoli e dall'environment per inviare
+informazioni alla GUI. Nell'esempio, selezionare il \texttt{192.168.1.100}.
+
+Una volta completati tutti i campi fare click su \emph{Start} per avviare
+l'interfaccia. Eventuali errori dovuti a nodi non raggiungibili o environment
+non avviato vengono segnalati. Se la fase di collegamento con il nodo remoto va
+a buon fine si apre l'interfaccia dalla quale gestire e monitorare
+l'applicativo.
+
+Chiudendo una qualsiasi delle finestre dell'interfaccia grafica, o inviando
+\texttt{CTRL-C} dalla shell, si stoppa l'applicativo.
+
+\begin{figure}
+\centering
+\includegraphics[width=\textwidth]{guisetup}
+\caption{Schermata d'avvio.}
+\label{fig:gui-start}
+\end{figure}
 
 \end{document}
 
@@ -1060,3 +1023,5 @@ Important, but secondary considerations include:
 % ispell-dictionary: "italiano"
 % TeX-command-extra-options: "-shell-escape"
 % End:
+
+% LocalWords:  sensoristica timer
