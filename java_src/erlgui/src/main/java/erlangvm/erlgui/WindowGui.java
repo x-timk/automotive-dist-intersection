@@ -291,7 +291,7 @@ public class WindowGui {
 			    {
 			        InetAddress i = (InetAddress) ee.nextElement();
 			        availableIp.add(i.getHostAddress());
-			        System.out.println(i.getHostAddress());
+			        // System.out.println(i.getHostAddress());
 			    }
 			}
 		} catch (SocketException e2) {
