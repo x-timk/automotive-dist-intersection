@@ -196,17 +196,6 @@ create_graph(GType) ->
 
   G.
 
-get_min_path(G, V1, V2) ->
-  ShortestPaths = dijkstra:run(G,V1),
-  get_shortest_path(ShortestPaths, V2).
-
-
-get_shortest_path(ShortestsPaths, V2) ->
-  {V2, Res} = lists:keyfind(V2, 1, ShortestsPaths),
-  case Res of
-    {_, Path} -> Path;
-    unreachable -> Res
-  end.
 
 get_neighbourhood(G, V, Range) ->
   ShortestPaths = dijkstra:run(G, V),
@@ -290,9 +279,6 @@ get_vertex_cars_array(G, Vertices) ->
 %% VStop: posizione finale
 %% Speed: velocita' movimento (es: con un valore 2000 l'auto tenta di muoversi ogni 2 secondi)
 add_car_to_graph(W, Name, Desc, VStart, Vstop, Speed, Prio, FaultProb) ->
-  %% TODO: testare la mappa dei shortest path, se funziona canellare le chiamate
-  %% a get_min_path
-  Path = get_min_path(W#world.dir, VStart, Vstop),
   Path = maps:get({VStart, Vstop}, W#world.shortest_paths),
   {Res, _Ot} = vehicle:start_link({?MODULE, Name, Desc, decorate_vertices_with_type(W#world.dir, Path), Speed, Prio, FaultProb, W#world.jgui}),
   case Res of
