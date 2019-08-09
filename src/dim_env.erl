@@ -1,6 +1,7 @@
 -module(dim_env).
 -export([go/0,t/0]).
 
+-export([start/0]).
 %% Export Public API genserver
 -export([spawn_car/7, req_prox_sensor_data/2, broadcast_disc/1, notify_move/3, delete_car/2, request_towtruck/1, add_jgui_endpoint/2]).
 
@@ -22,7 +23,7 @@
 -define(GENSERVER_CALL_TIMEOUT, 10000).
 
 -behaviour(gen_server).
-
+-behaviour(application).
 %% Simple print to console
 %% print( What) ->
 %%   MyPid = pid_to_list(self()) ++ ":",
@@ -402,6 +403,11 @@ terminate(_Args, _Fd) ->
 go() ->
   World = create_world(),
   gen_server:start_link({local, ?MODULE}, dim_env, World, []).
+
+start() ->
+  World = create_world(),
+  {ok, Pid} = gen_server:start_link({local, ?MODULE}, dim_env, World, []),
+  unlink(Pid).
 
 t() ->
   World = create_world(),
