@@ -9,11 +9,17 @@ GUI_JAR="erlDIM.jar"
 # do not change
 AUTH_COOKIE="guitar"
 
+# calc possible ip addresses
+IPADDRESSES="$(ifconfig | grep inet | grep -v inet6 | grep -v "127.0.0.1" | awk '{print $2}')"
+# IPADDRESSES="$(ifconfig | grep inet | grep -v inet6 | awk '{print $2}' | tr '\n' ' ')" 
+IPADDRESSES_N="${IPADDRESSES//$'\n'/ }"
+echo "Your Ip Addresses are: $IPADDRESSES_N"
+
 if [ "$#" -lt 1 ]; then
     echo "Illegal number of parameters"
     echo "Usage: ./start.sh -e <erlang-node-name> -i <ip-address>"
-    echo "Example: ./start.sh -e envnode -i \"192.168.1.100\""
-	echo "With this example you will start the environment on an erlang node called envnode@192.168.1.100"
+    echo "Example: ./start.sh -e envnode -i \"$IPADDRESSES\""
+	echo "With this example you will start the environment on an erlang node called envnode@$IPADDRESSES"
     exit 1
 fi
 
@@ -24,8 +30,8 @@ while getopts "e:i:h?:" option; do
 		i) ENV_IP=$OPTARG;;
 		h) echo "Help page"
     	echo "Usage: ./start.sh -e <erlang-node-name> -i <ip-address>"
-		echo "Example: ./start.sh -e envnode -i \"192.168.1.100\""
-		echo "With this example you will start the environment on an erlang node called envnode@192.168.1.100"
+		echo "Example: ./start.sh -e envnode -i \"$IPADDRESSES\""
+		echo "With this example you will start the environment on an erlang node called envnode@$IPADDRESSES"
 		exit 0
 	esac
 done
