@@ -276,7 +276,7 @@ public class WindowGui {
 		remoteErlangIp.setBounds(50,50,50,30);
 		login.add(remoteErlangIp);
 		
-		JButton go = new JButton("Let's Go!");
+		JButton go = new JButton("Start");
 		login.add(go);
 		
 		Enumeration e;
